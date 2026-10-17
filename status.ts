@@ -171,7 +171,7 @@ async function fetchUserStatus(apiKey: string, host: string, signal?: AbortSigna
     resp = await fetch(`${host.replace(/\/$/, "")}/exa.seat_management_pb.SeatManagementService/GetUserStatus`, {
       method: "POST",
       headers: { "Content-Type": "application/proto", "Connect-Protocol-Version": "1" },
-      body: encodeMessage(1, metadata),
+      body: new Uint8Array(encodeMessage(1, metadata)),
       signal: signal ?? ac.signal,
     });
   } finally {

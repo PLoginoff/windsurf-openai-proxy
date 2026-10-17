@@ -1,9 +1,11 @@
 {
   "name": "windsurf-openai",
   "version": "0.2.0",
-  "description": "Standalone OpenAI-compatible proxy for Windsurf/Cognition/Devin models — use Claude, GPT, Gemini, Kimi, SWE in Zed (or any editor) via your Windsurf subscription",
+  "description": "Use Windsurf/Cognition/Devin models (Claude, GPT, Gemini, Kimi, SWE) in Zed, Cline or any client — one zero-dep proxy speaking OpenAI, Ollama and llama.cpp protocols, with cost tiers, power ranks and multi-key access built in",
   "author": "ploginoff",
-  "contributors": ["Ken Taylor (original pi-windsurf)"],
+  "contributors": [
+    "Ken Taylor (original pi-windsurf)"
+  ],
   "license": "MIT",
   "keywords": [
     "windsurf",
@@ -11,6 +13,9 @@
     "codeium",
     "cognition",
     "zed",
+    "cline",
+    "ollama",
+    "llama-cpp",
     "openai-compatible",
     "llm-proxy",
     "claude",
@@ -38,5 +43,8 @@
     "*.ts",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^26.6.5"
+  }
 }

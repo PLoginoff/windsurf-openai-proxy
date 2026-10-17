@@ -8,7 +8,8 @@
  *   npx tsx cli.ts logout
  *   npx tsx cli.ts models
  *
- * The proxy speaks OpenAI Chat Completions at http://<host>:<port>/v1.
+ * The proxy speaks OpenAI Chat Completions at http://<host>:<port>/v1 and
+ * Ollama-native /api/tags + /api/chat (Zed llama.cpp/ollama providers, Cline).
  * Localhost clients need no key; remote clients (--host 0.0.0.0) send a
  * Bearer key from keys.json, or the Windsurf apiKey (printed by `status`).
  *
@@ -77,6 +78,7 @@ async function cmdServe(port: number, host: string): Promise<void> {
   console.error(`[windsurf] proxy listening on http://${host}:${actualPort}/v1`);
   console.error(`[windsurf] models endpoint:  http://${host}:${actualPort}/v1/models`);
   console.error(`[windsurf] chat endpoint:   http://${host}:${actualPort}/v1/chat/completions`);
+  console.error(`[windsurf] ollama endpoint:  http://${host}:${actualPort}/api/tags (+/api/chat, /api/show)`);
 
   const nKeys = keyCount();
   if (nKeys > 0) {
@@ -91,7 +93,7 @@ async function cmdServe(port: number, host: string): Promise<void> {
         const name = policy.name ?? key;
         const limit = creditLimit(policy);
         const visible = limit !== undefined
-          ? usable.filter(m => isActuallyFreePromo(m) || isPromoActive(m) || (m.creditsPerPrompt ?? 0) <= limit).length
+          ? usable.filter(m => isActuallyFreePromo(m) || (m.creditsPerPrompt ?? 0) <= limit).length
           : usable.length;
         const label = limit !== undefined ? `≤${limit}cr` : "unlimited";
         console.error(`[windsurf]   "${name}" → ${visible} models (${label})`);

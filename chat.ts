@@ -451,6 +451,7 @@ export async function* streamChatEvents(req: CloudChatRequest): AsyncGenerator<C
     requestType: req.requestType, completionOpts: req.completionOpts,
   });
   const body = frameConnectStream(proto, true);
+  const bodyBytes = new Uint8Array(body);
 
   const ttfbController = new AbortController();
   const ttfbTimer = setTimeout(() => ttfbController.abort(new Error(`TTFB timeout (${CLOUD_STREAM_TTFB_MS}ms)`)), CLOUD_STREAM_TTFB_MS);
@@ -467,7 +468,7 @@ export async function* streamChatEvents(req: CloudChatRequest): AsyncGenerator<C
         "Connect-Content-Encoding": "gzip",
         "Connect-Accept-Encoding": "gzip",
       },
-      body,
+      body: bodyBytes,
       signal: initialSignal,
     });
   } finally {

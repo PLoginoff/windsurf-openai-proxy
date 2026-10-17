@@ -38,6 +38,23 @@ interface ChatCompletionRequest {
   tools?: Array<{ type?: string; function?: { name?: string; description?: string; parameters?: Record<string, unknown> } }>;
 }
 
+// Ollama-native chat request (/api/chat) — translated into the same pipeline.
+// Differences from OpenAI: content parts use {type:"image", image:"<b64>"},
+// tool_call arguments may be objects, options carry num_predict/temperature.
+interface OllamaChatRequest {
+  model?: string;
+  messages: Array<{
+    role: string;
+    content?: string | Array<{ type: string; text?: string; image?: string; image_url?: { url: string } }>;
+    tool_call_id?: string;
+    tool_name?: string;
+    tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: unknown } }>;
+  }>;
+  stream?: boolean;
+  tools?: Array<Record<string, unknown>>;
+  options?: { num_predict?: number; temperature?: number; top_k?: number; top_p?: number; num_ctx?: number };
+}
+
 function mapMessageToHistoryItem(m: ChatCompletionRequest["messages"][number]): ChatHistoryItem {
   const item: ChatHistoryItem = { role: m.role as ChatHistoryItem["role"], content: m.content as ChatHistoryItem["content"] };
   if (m.role === "tool" && typeof m.tool_call_id === "string" && m.tool_call_id.length > 0) {
@@ -113,11 +130,13 @@ export async function buildModelList(maxCredits?: number): Promise<ModelListItem
     out.push({ id: label, name: label, canonical: uid, tier, ...(contextWindow ? { contextWindow } : {}) });
   };
 
-  // Per-key filter: with a max_credits limit, only free/promo and models
-  // costing ≤ limit credits/prompt are listed. 0 = free/promo only.
+  // Per-key filter: with a max_credits limit, only models costing ≤ limit
+  // credits/prompt are listed. Real 0-credit free promo (SWE line) costs 0.
+  // Promo models with >0 credits (like Gemini Flash at 6-10cr) are evaluated
+  // by their actual creditsPerPrompt.
   const withinLimit = (m: UserStatusModel): boolean => {
     if (maxCredits === undefined) return true;
-    if (isActuallyFreePromo(m) || isPromoActive(m)) return true;
+    if (isActuallyFreePromo(m)) return true;
     return (m.creditsPerPrompt ?? 0) <= maxCredits;
   };
 
@@ -201,10 +220,11 @@ function tierForModel(uid: string): PriceTier {
   return asTier(userTierOverride(uid));
 }
 
-function logCost(modelId: string, usage: UsageSummary | null): void {
+function logCost(modelId: string, usage: UsageSummary | null, keyPolicy?: KeyPolicy): void {
   if (!usage) return;
   const fmt = (n?: number) => (n ?? 0).toLocaleString("en-US");
-  console.error(`[windsurf] ${modelId}  in=${fmt(usage.promptTokens)} out=${fmt(usage.completionTokens)}  (${tierForModel(modelId)})`);
+  const who = keyPolicy?.name ? ` [${keyPolicy.name}]` : "";
+  console.error(`[windsurf] ${modelId}  in=${fmt(usage.promptTokens)} out=${fmt(usage.completionTokens)}  (${tierForModel(modelId)})${who}`);
 }
 
 function openAIError(status: number, message: string, details?: string): object {
@@ -215,19 +235,56 @@ function isLoopbackAddress(addr: string | undefined): boolean {
   return addr === "127.0.0.1" || addr === "::1" || addr === "::ffff:127.0.0.1";
 }
 
-async function authorizeRequest(req: IncomingMessage): Promise<{ status: number; body: string; contentType: string; keyPolicy?: KeyPolicy } | null> {
+export function extractPathKeyAndNormalize(pathname: string): { normalizedPath: string; pathKey: string | null } {
+  // Matches:
+  //   /key:<key>/v1/models
+  //   /k:<key>/v1/models
+  //   /key/<key>/v1/models
+  //   /k/<key>/v1/models
+  const match = pathname.match(/^\/(?:key:|k:|key\/|k\/)([^/]+)(\/.*)?$/);
+  if (match) {
+    const pathKey = decodeURIComponent(match[1]);
+    const rest = match[2] || "/";
+    return { normalizedPath: rest, pathKey };
+  }
+  return { normalizedPath: pathname, pathKey: null };
+}
+
+function extractBearerOrQueryKey(req: IncomingMessage, url: URL, pathKey: string | null): string | null {
+  // 1. Path prefix /key:<key> — highest priority: when present, the header is
+  // ignored (clients like Zed/Cline tend to stuff garbage into Authorization).
+  if (pathKey && pathKey.trim().length > 0) return pathKey.trim();
+  // 2. Header
   const authHeader = (req.headers.authorization ?? "") as string;
+  if (authHeader.startsWith("Bearer ")) {
+    const key = authHeader.slice("Bearer ".length).trim();
+    if (key.length > 0) return key;
+  }
+  // 3. Query param ?key= / ?api_key=
+  const qKey = url.searchParams.get("key") ?? url.searchParams.get("api_key");
+  if (qKey && qKey.trim().length > 0) return qKey.trim();
+  return null;
+}
+
+async function authorizeRequest(req: IncomingMessage, url: URL, pathKey: string | null): Promise<{ status: number; body: string; contentType: string; keyPolicy?: KeyPolicy } | null> {
   const ip = req.socket.remoteAddress;
 
   // Local clients (Zed, curl on this machine) are trusted without a Bearer key —
   // the proxy is localhost-oriented and the key only guards remote access when
   // bound to a non-loopback host (--host 0.0.0.0).
-  if (isLoopbackAddress(ip)) return null;
-
-  if (!authHeader.startsWith("Bearer ")) {
-    return { status: 401, body: JSON.stringify({ error: { message: "Unauthorized: missing or malformed Authorization header.", type: "windsurf_error" } }), contentType: "application/json" };
+  if (isLoopbackAddress(ip)) {
+    const presented = extractBearerOrQueryKey(req, url, pathKey);
+    if (presented) {
+      const policy = authenticateKey(presented);
+      if (policy) return { status: 0, body: "", contentType: "", keyPolicy: policy };
+    }
+    return null;
   }
-  const presented = authHeader.slice("Bearer ".length);
+
+  const presented = extractBearerOrQueryKey(req, url, pathKey);
+  if (!presented) {
+    return { status: 401, body: JSON.stringify({ error: { message: "Unauthorized: missing Authorization header, path prefix /key:<key>, or ?key query param.", type: "windsurf_error" } }), contentType: "application/json" };
+  }
   const presentedBuf = Buffer.from(presented, "utf8");
 
   // keys.json policies first (per-key model restrictions)
@@ -243,7 +300,7 @@ async function authorizeRequest(req: IncomingMessage): Promise<{ status: number;
     }
   } catch {}
 
-  return { status: 401, body: JSON.stringify({ error: { message: "Unauthorized: Invalid Bearer token.", type: "windsurf_error" } }), contentType: "application/json" };
+  return { status: 401, body: JSON.stringify({ error: { message: "Unauthorized: Invalid API key.", type: "windsurf_error" } }), contentType: "application/json" };
 }
 
 function getBody(req: IncomingMessage): Promise<string> {
@@ -257,7 +314,9 @@ function getBody(req: IncomingMessage): Promise<string> {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
-    const url = new URL(req.url ?? "/", `http://${WINDSURF_PROXY_HOST}`);
+    const rawUrl = new URL(req.url ?? "/", `http://${WINDSURF_PROXY_HOST}`);
+    const { normalizedPath, pathKey } = extractPathKeyAndNormalize(rawUrl.pathname);
+    const url = new URL(normalizedPath + rawUrl.search, `http://${WINDSURF_PROXY_HOST}`);
 
     // /health — unauthenticated
     if (url.pathname === "/health") {
@@ -271,12 +330,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     // These leak nothing (model names/tiers only, localhost-bound); chat still
     // requires the Bearer key.
     if (req.method === "GET" && (url.pathname === "/v1/models" || url.pathname === "/models")) {
-      // If the client sent a Bearer key from keys.json with a max_credits limit,
-      // filter the list to models within that budget. No key → full list.
-      const authHeader = (req.headers.authorization ?? "") as string;
+      // If the client sent a Bearer key (or path prefix /k/<key> or query param) from keys.json
+      // with a max_credits limit, filter the list to models within that budget.
+      const presented = extractBearerOrQueryKey(req, rawUrl, pathKey);
       let maxCredits: number | undefined;
-      if (authHeader.startsWith("Bearer ")) {
-        const policy = authenticateKey(authHeader.slice("Bearer ".length));
+      if (presented) {
+        const policy = authenticateKey(presented);
         if (policy) maxCredits = creditLimit(policy);
       }
       const items = await buildModelList(maxCredits);
@@ -328,14 +387,305 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       return;
     }
 
+    // GET /api/tags — Ollama-native model list (Zed's/Cline's "Ollama" provider).
+    // Same data as /v1/models in Ollama's shape; honors the key policy for filtering.
+    if (req.method === "GET" && url.pathname === "/api/tags") {
+      const presented = extractBearerOrQueryKey(req, rawUrl, pathKey);
+      let maxCredits: number | undefined;
+      if (presented) {
+        const policy = authenticateKey(presented);
+        if (policy) maxCredits = creditLimit(policy);
+      }
+      const items = await buildModelList(maxCredits);
+      const modified = new Date().toISOString();
+      const models = items.map(m => ({
+        name: m.id,
+        model: m.id,
+        modified_at: modified,
+        size: 0,
+        digest: m.canonical,
+        details: {
+          parent_model: "",
+          format: "gguf",
+          family: "windsurf",
+          families: ["windsurf"],
+          parameter_size: "",
+          quantization_level: "",
+        },
+      }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ models }));
+      return;
+    }
+
+    // GET /api/version — Ollama version probe (some clients check it).
+    if (req.method === "GET" && url.pathname === "/api/version") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ version: "0.0.0" }));
+      return;
+    }
+
+    // POST /api/show — Ollama model info (modelfile, capabilities, context).
+    // Cline calls this per model; answer with real context window + caps.
+    if (req.method === "POST" && url.pathname === "/api/show") {
+      const rawBody = await getBody(req);
+      let model: string | undefined;
+      try { model = (JSON.parse(rawBody) as { model?: string }).model; } catch {}
+      let nCtx = 128000;
+      if (model) {
+        const items = await buildModelList();
+        const trimmed = model.trim();
+        const hit = items.find(m => m.id === model || m.canonical === model)
+          ?? items.find(m => m.id.trim() === trimmed || m.canonical === trimmed);
+        if (hit?.contextWindow) nCtx = hit.contextWindow;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        license: "",
+        modelfile: "",
+        parameters: "",
+        template: "",
+        model_info: {
+          "general.architecture": "windsurf",
+          "general.family": "windsurf",
+          "windsurf.context_length": nCtx,
+        },
+        // Ollama sends a string array here; Zed's ModelShow deserializer expects
+        // Vec<String> and enables features by name: "tools", "vision", "thinking".
+        capabilities: ["completion", "tools", "vision", "thinking"],
+        ...(nCtx ? { "general.context_length": nCtx } : {}),
+        messages: [],
+        modified_at: new Date().toISOString(),
+      }));
+      return;
+    }
+
     // Auth gate for everything else
-    const auth = await authorizeRequest(req);
+    const auth = await authorizeRequest(req, rawUrl, pathKey);
     if (auth && auth.status !== 0) {
       res.writeHead(auth.status, { "Content-Type": auth.contentType });
       res.end(auth.body);
       return;
     }
     const keyPolicy = auth?.keyPolicy;
+
+    // POST /api/chat — Ollama-native chat (Zed's/Cline's "Ollama" provider).
+    if (url.pathname === "/api/chat") {
+      if (req.method !== "POST") {
+        res.writeHead(405, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Method not allowed; use POST." }));
+        return;
+      }
+
+      const rawBody = await getBody(req);
+      let body: OllamaChatRequest;
+      try { body = JSON.parse(rawBody) as OllamaChatRequest; }
+      catch { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Malformed JSON." })); return; }
+
+      if (!body.messages || !Array.isArray(body.messages)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "messages must be an array." }));
+        return;
+      }
+
+      const creds = loadCredentials();
+      if (!creds) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Not authenticated. Run `windsurf-openai login` first." }));
+        return;
+      }
+
+      const modelUid = await resolveRequestedModel(typeof body.model === "string" ? body.model : undefined);
+      if (!modelUid) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing 'model' in request body." }));
+        return;
+      }
+
+      // Per-key model restriction (same rule as the OpenAI endpoint)
+      const keyLimit = keyPolicy ? creditLimit(keyPolicy) : undefined;
+      if (keyLimit !== undefined) {
+        const status = getCachedUserStatus();
+        const m = status?.models.get(modelUid);
+        const credits = m?.creditsPerPrompt ?? 0;
+        const isFree = m ? isActuallyFreePromo(m) : false;
+        if (!isFree && credits > keyLimit) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Model not allowed for this key: costs ${credits} credits/prompt, limit is ${keyLimit}. Pick a cheaper model.` }));
+          return;
+        }
+      }
+
+      // Tools: accept OpenAI format and Ollama's flat {name, description, parameters}.
+      const tools: ToolDef[] = [];
+      for (const t of body.tools ?? []) {
+        const rec = t as { function?: { name?: string; description?: string; parameters?: Record<string, unknown> }; name?: string; description?: string; parameters?: Record<string, unknown> };
+        const fn = rec.function;
+        if (fn && typeof fn.name === "string") tools.push({ name: fn.name, description: fn.description ?? "", parameters: fn.parameters ?? {} });
+        else if (typeof rec.name === "string") tools.push({ name: rec.name, description: rec.description ?? "", parameters: rec.parameters ?? {} });
+      }
+
+      // Messages: normalize Ollama image parts ({type:"image", image:"<b64>"})
+      // and tool_call arguments (Ollama allows objects; our wire wants strings).
+      const multimodalMessages: ChatHistoryItem[] = body.messages.map(m => {
+        let content: ChatCompletionRequest["messages"][number]["content"] = "";
+        if (Array.isArray(m.content)) {
+          content = m.content.map(p => {
+            if (p.type === "image" && typeof p.image === "string") {
+              const url = p.image.startsWith("data:") ? p.image : `data:image/png;base64,${p.image}`;
+              return { type: "image_url" as const, image_url: { url } };
+            }
+            return { type: p.type, ...(p.text !== undefined ? { text: p.text } : {}), ...(p.image_url ? { image_url: p.image_url } : {}) };
+          });
+        } else if (typeof m.content === "string") {
+          content = m.content;
+        }
+        const toolCalls = Array.isArray(m.tool_calls)
+          ? m.tool_calls.map(tc => ({
+            id: typeof tc?.id === "string" && tc.id ? tc.id
+              : typeof tc?.function?.name === "string" ? `call-${tc.function.name}` : undefined,
+            type: "function",
+            function: {
+              name: typeof tc?.function?.name === "string" ? tc.function.name : "",
+              arguments: typeof tc?.function?.arguments === "object" && tc.function.arguments !== null
+                ? JSON.stringify(tc.function.arguments)
+                : typeof tc?.function?.arguments === "string" ? tc.function.arguments : "",
+            },
+          }))
+          : undefined;
+        // Zed's Ollama provider sends tool results as {role:"tool", tool_name, content}
+        // with no tool_call_id — map tool_name onto it so the wire can pair them.
+        const toolCallId = typeof m.tool_call_id === "string" && m.tool_call_id
+          ? m.tool_call_id
+          : typeof m.tool_name === "string" && m.tool_name ? m.tool_name : undefined;
+        return mapMessageToHistoryItem({ role: m.role, content: content ?? "", tool_call_id: toolCallId, tool_calls: toolCalls });
+      });
+
+      const opts = body.options ?? {};
+      const completionOpts = {
+        maxOutputTokens: typeof opts.num_predict === "number" && opts.num_predict > 0 ? opts.num_predict : 128_000,
+        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+        ...(typeof opts.top_k === "number" ? { topK: opts.top_k } : {}),
+        ...(typeof opts.top_p === "number" ? { topP: opts.top_p } : {}),
+      };
+      const isStreaming = body.stream !== false;
+      const modelName = typeof body.model === "string" ? body.model : modelUid;
+      const nowIso = (): string => new Date().toISOString();
+
+      if (isStreaming) {
+        // NDJSON streaming, Ollama-native chunks. Tool calls are buffered and
+        // flushed whole (one complete tool_calls line per call) — clients
+        // accumulate `function.arguments` strings across chunks, so this is
+        // the most compatible shape.
+        res.writeHead(200, { "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache", "Connection": "keep-alive" });
+        const abort = new AbortController();
+        req.on("close", () => { if (!res.writableEnded) abort.abort(); });
+        const send = (o: unknown): void => { res.write(`${JSON.stringify(o)}\n`); };
+        let usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | null = null;
+        let pendingToolCall: { name: string; args: string } | null = null;
+        let toolCallSeq = 0;
+        const flushToolCall = (): void => {
+          if (!pendingToolCall) return;
+          // Zed's ChatResponseDelta requires tool_calls[].id (String) and expects
+          // arguments as a JSON object — it becomes the tool input verbatim.
+          let args: unknown = pendingToolCall.args;
+          try { args = JSON.parse(pendingToolCall.args); } catch { /* keep raw string */ }
+          send({
+            model: modelName, created_at: nowIso(), done: false,
+            message: {
+              role: "assistant", content: "",
+              tool_calls: [{
+                id: `call-${pendingToolCall.name}-${(toolCallSeq += 1)}`,
+                function: { name: pendingToolCall.name, arguments: args },
+              }],
+            },
+          });
+          pendingToolCall = null;
+        };
+        try {
+          for await (const ev of streamChatEventsWithRetry({
+            apiKey: creds.apiKey,
+            apiServerUrl: creds.apiServerUrl,
+            modelUid,
+            messages: multimodalMessages,
+            tools: tools.length > 0 ? tools : undefined,
+            signal: abort.signal,
+            completionOpts,
+          })) {
+            if (ev.kind === "text") {
+              send({ model: modelName, created_at: nowIso(), message: { role: "assistant", content: ev.text }, done: false });
+            } else if (ev.kind === "reasoning") {
+              send({ model: modelName, created_at: nowIso(), message: { role: "assistant", content: "", thinking: ev.text }, done: false });
+            } else if (ev.kind === "tool_call_start") {
+              flushToolCall();
+              pendingToolCall = { name: ev.name, args: "" };
+            } else if (ev.kind === "tool_call_args") {
+              if (pendingToolCall) pendingToolCall.args += ev.argsDelta;
+            } else if (ev.kind === "usage") {
+              usage = { promptTokens: ev.promptTokens, completionTokens: ev.completionTokens, totalTokens: ev.totalTokens };
+            }
+          }
+          flushToolCall();
+          send({
+            model: modelName, created_at: nowIso(),
+            message: { role: "assistant", content: "" },
+            done_reason: "stop", done: true,
+            ...(usage ? { prompt_eval_count: usage.promptTokens ?? 0, eval_count: usage.completionTokens ?? 0 } : {}),
+          });
+          res.end();
+          logCost(modelUid, usage, keyPolicy);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          console.error(`[windsurf] CHAT ERROR (${modelUid}): ${errorMessage}`);
+          // A bare {error} line breaks Zed's line parser (ChatResponseDelta):
+          // send the error as a final assistant message instead.
+          try {
+            send({ model: modelName, created_at: nowIso(), message: { role: "assistant", content: `Error: ${errorMessage}` }, done_reason: "error", done: true });
+            res.end();
+          } catch { /* socket dead */ }
+        }
+      } else {
+        // Non-streaming: single JSON response
+        let collected = "";
+        let usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | null = null;
+        type CollectedToolCall = { name: string; args: string };
+        const collectedToolCalls: CollectedToolCall[] = [];
+        let currentToolCall: CollectedToolCall | null = null;
+        const abort = new AbortController();
+        req.on("close", () => { if (!res.writableEnded) abort.abort(); });
+        for await (const ev of streamChatEventsWithRetry({
+          apiKey: creds.apiKey,
+          apiServerUrl: creds.apiServerUrl,
+          modelUid,
+          messages: multimodalMessages,
+          tools: tools.length > 0 ? tools : undefined,
+          completionOpts,
+          signal: abort.signal,
+        })) {
+          if (ev.kind === "text") collected += ev.text;
+          else if (ev.kind === "tool_call_start") { currentToolCall = { name: ev.name, args: "" }; collectedToolCalls.push(currentToolCall); }
+          else if (ev.kind === "tool_call_args") { if (currentToolCall) currentToolCall.args += ev.argsDelta; }
+          else if (ev.kind === "usage") usage = { promptTokens: ev.promptTokens, completionTokens: ev.completionTokens, totalTokens: ev.totalTokens };
+        }
+        const message = collectedToolCalls.length > 0
+          ? {
+            role: "assistant", content: collected,
+            tool_calls: collectedToolCalls.map((tc, i) => {
+              let args: unknown = tc.args;
+              try { args = JSON.parse(tc.args); } catch { /* keep string */ }
+              return { id: `call-${tc.name}-${i + 1}`, function: { name: tc.name, arguments: args } };
+            }),
+          }
+          : { role: "assistant", content: collected };
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          model: modelName, created_at: nowIso(), message, done: true, done_reason: "stop",
+          ...(usage ? { prompt_eval_count: usage.promptTokens ?? 0, eval_count: usage.completionTokens ?? 0 } : {}),
+        }));
+        logCost(modelUid, usage, keyPolicy);
+      }
+      return;
+    }
 
     // /v1/chat/completions
     if (url.pathname === "/v1/chat/completions" || url.pathname === "/chat/completions") {
@@ -374,13 +724,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         return;
       }
 
-      // Per-key model restriction: max credits-per-prompt (free/promo always pass)
+      // Per-key model restriction: max credits-per-prompt (SWE free always passes)
       const keyLimit = keyPolicy ? creditLimit(keyPolicy) : undefined;
       if (keyLimit !== undefined) {
         const status = getCachedUserStatus();
         const m = status?.models.get(modelUid);
         const credits = m?.creditsPerPrompt ?? 0;
-        const isFree = m ? isActuallyFreePromo(m) || isPromoActive(m) : false;
+        const isFree = m ? isActuallyFreePromo(m) : false;
         if (!isFree && credits > keyLimit) {
           res.writeHead(403, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: { message: `Model not allowed for this key: costs ${credits} credits/prompt, limit is ${keyLimit}. Pick a cheaper model.`, type: "windsurf_error" } }));
@@ -473,7 +823,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
           }
           res.write("data: [DONE]\n\n");
           res.end();
-          logCost(modelUid, usage);
+          logCost(modelUid, usage, keyPolicy);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "Unknown error";
           console.error(`[windsurf] CHAT ERROR (${modelUid}): ${errorMessage}`);
@@ -527,7 +877,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         };
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(resp));
-        logCost(modelUid, usage);
+        logCost(modelUid, usage, keyPolicy);
       }
       return;
     }

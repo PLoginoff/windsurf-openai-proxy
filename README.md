@@ -1,6 +1,6 @@
 # windsurf-openai
 
-Standalone proxy that exposes **Windsurf/Cognition/Devin models as a plain OpenAI API** — plug them into Zed, or any OpenAI-compatible client, using your existing Windsurf subscription.
+One zero-dep, **OpenAI-compatible** proxy (also speaks Ollama and llama.cpp) — use your Windsurf/Cognition/Devin subscription models (Claude, GPT, Gemini, Kimi, SWE) in **Zed, Cline or any editor**, with cost tiers, power ranks and multi-key access built in.
 
 The main point of this proxy isn't just bridging the protocol — it's **giving you instant clarity on what to use right now**. Windsurf has 200+ models with hidden credit costs, shifting promo windows, and wildly varying capability. This proxy decorates every model name with its **power rank and cost tier** (`Kimi K3 High ★76 $`, `SWE-2 High ★50 free`), pins top picks on top, and comes with a `recommend` command that highlights the real freebies, best-value models, and overpriced traps at a glance.
 
@@ -30,7 +30,7 @@ There are alternatives ([WindsurfAPI](https://github.com/dwgx/WindsurfAPI), `win
 Zed → proxy (localhost:42100, OpenAI API) → Windsurf cloud (Connect-RPC)
 ```
 
-The proxy translates standard OpenAI Chat Completions to Windsurf's proprietary wire format.
+The proxy translates standard OpenAI Chat Completions to Windsurf's proprietary Connect-RPC API — the same one the Windsurf IDE speaks.
 
 ## Quick start
 
@@ -71,6 +71,20 @@ With `--host 0.0.0.0` you can serve friends/teammates over the network. Put Bear
 ```
 
 `max_credits` limits which models that key can list and call: `-1` or missing = unlimited, `0` = free/promo only, `N` = models costing ≤ N credits/prompt. Free/promo models always pass. At startup the proxy logs each key's name with its visible model count.
+
+Clients can authenticate in three ways:
+1. Header: `Authorization: Bearer <key>` (standard OpenAI clients).
+2. Path prefix: `http://<host>:42100/key:<key>` (recommended for Zed's `llama.cpp` provider, e.g. `"api_url": "http://server:42100/key:friend-key"`).
+3. Query param: `http://<host>:42100?key=<key>`.
+
+### Cline / other Ollama clients
+
+The proxy also speaks **Ollama's native protocol**: `GET /api/tags` for the model list, `POST /api/chat` for chat (NDJSON streaming, tool calls supported) and `POST /api/show` for capabilities/context (what Zed's `ollama` provider probes per model). Point any Ollama client at it:
+
+- **Cline** → API Provider: *Ollama*, base URL `http://<host>:42100` (or `http://<host>:42100/key:<key>` for a per-key model list)
+- **Zed** → the `ollama` provider works too: `"ollama": { "api_url": "http://127.0.0.1:42100" }`
+
+Same key rules as everywhere else: localhost needs no key, remote clients use the path prefix (Ollama clients don't send auth headers).
 
 ## CLI
 

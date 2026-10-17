@@ -81,12 +81,12 @@ async function cmdServe(port: number, host: string): Promise<void> {
   console.error(`[windsurf] ollama endpoint:  http://${host}:${actualPort}/api/tags (+/api/chat, /api/show)`);
 
   const nKeys = keyCount();
-  if (nKeys > 0) {
+  if (nKeys > 0 && stored) {
     console.error(`[windsurf] access keys: ${nKeys} configured in keys.json`);
     // Single status fetch — the model list is already warmed above (or will
     // come from the same in-flight request). Count per key from that, not from
     // buildModelList() per key — each call re-fires getUserStatus and stalls.
-    const status = await getUserStatus(stored!.apiKey, stored!.apiServerUrl).catch(() => null);
+    const status = await getUserStatus(stored.apiKey, stored.apiServerUrl).catch(() => null);
     if (status) {
       const usable = [...status.models.values()].filter(m => !m.disabled && !isBlockedModel(m.uid));
       for (const [key, policy] of getKeys()) {
@@ -99,6 +99,8 @@ async function cmdServe(port: number, host: string): Promise<void> {
         console.error(`[windsurf]   "${name}" → ${visible} models (${label})`);
       }
     }
+  } else if (nKeys > 0) {
+    console.error("[windsurf] keys.json present but not logged in — run: windsurf-openai login");
   } else {
     console.error("[windsurf] access: localhost only (no keys.json — full local access)");
   }
@@ -205,8 +207,7 @@ async function cmdModels(zed: boolean): Promise<void> {
 }
 
 function fmtPrice(n: number): string {
-  const r = Math.round(n * 100) / 100;
-  return Number.isInteger(r) ? String(r) : String(r);
+  return String(Math.round(n * 100) / 100);
 }
 
 async function cmdRecommend(all: boolean, md = false): Promise<void> {

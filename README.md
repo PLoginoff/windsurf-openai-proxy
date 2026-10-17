@@ -59,6 +59,15 @@ Restart Zed — the model list appears automatically: a few **featured models pi
 
 Other editors: point any OpenAI-compatible client at `http://127.0.0.1:42100/v1` (auth: Bearer key from `cli.ts status` for non-localhost clients).
 
+### Cline / other Ollama clients
+
+The proxy also speaks **Ollama's native protocol**: `GET /api/tags` for the model list, `POST /api/chat` for chat (NDJSON streaming, tool calls supported) and `POST /api/show` for capabilities/context (what Zed's `ollama` provider probes per model). Point any Ollama client at it:
+
+- **Cline** → API Provider: *Ollama*, base URL `http://<host>:42100` (or `http://<host>:42100/key:<key>` for a per-key model list)
+- **Zed** → the `ollama` provider works too: `"ollama": { "api_url": "http://127.0.0.1:42100" }`
+
+Same key rules as everywhere else: localhost needs no key, remote clients use the path prefix (Ollama clients don't send auth headers).
+
 ### Remote access
 
 With `--host 0.0.0.0` you can serve friends/teammates over the network. Put Bearer keys in `keys.json` next to the CLI (see `keys.json.example`):
@@ -76,15 +85,6 @@ Clients can authenticate in three ways:
 1. Header: `Authorization: Bearer <key>` (standard OpenAI clients).
 2. Path prefix: `http://<host>:42100/key:<key>` (recommended for Zed's `llama.cpp` provider, e.g. `"api_url": "http://server:42100/key:friend-key"`).
 3. Query param: `http://<host>:42100?key=<key>`.
-
-### Cline / other Ollama clients
-
-The proxy also speaks **Ollama's native protocol**: `GET /api/tags` for the model list, `POST /api/chat` for chat (NDJSON streaming, tool calls supported) and `POST /api/show` for capabilities/context (what Zed's `ollama` provider probes per model). Point any Ollama client at it:
-
-- **Cline** → API Provider: *Ollama*, base URL `http://<host>:42100` (or `http://<host>:42100/key:<key>` for a per-key model list)
-- **Zed** → the `ollama` provider works too: `"ollama": { "api_url": "http://127.0.0.1:42100" }`
-
-Same key rules as everywhere else: localhost needs no key, remote clients use the path prefix (Ollama clients don't send auth headers).
 
 ## CLI
 

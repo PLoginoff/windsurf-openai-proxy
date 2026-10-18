@@ -1,5 +1,5 @@
 /**
- * windsurf-openai — standalone OpenAI-compatible proxy for Windsurf/Cognition.
+ * windsurf-openai-proxy — standalone OpenAI-compatible proxy for Windsurf/Cognition.
  *
  * Usage:
  *   npx tsx cli.ts serve [--port 42100] [--host 127.0.0.1]
@@ -71,7 +71,7 @@ async function cmdServe(port: number, host: string): Promise<void> {
       else console.log("[windsurf] OpenRouter unreachable — `recommend` will show no scores");
     }).catch(() => {});
   } else {
-    console.error("[windsurf] not authenticated — run: windsurf-openai login");
+    console.error("[windsurf] not authenticated — run: windsurf-openai-proxy login");
   }
 
   const actualPort = await startProxy(port, host);
@@ -100,7 +100,7 @@ async function cmdServe(port: number, host: string): Promise<void> {
       }
     }
   } else if (nKeys > 0) {
-    console.error("[windsurf] keys.json present but not logged in — run: windsurf-openai login");
+    console.error("[windsurf] keys.json present but not logged in — run: windsurf-openai-proxy login");
   } else {
     console.error("[windsurf] access: localhost only (no keys.json — full local access)");
   }
@@ -108,7 +108,7 @@ async function cmdServe(port: number, host: string): Promise<void> {
   if (stored) {
     console.error(`[windsurf] proxy auth:     Windsurf apiKey accepted for remote clients (Bearer ${stored.apiKey.slice(0, 12)}…)`);
   } else {
-    console.error("[windsurf] chat will return 503 until you log in (windsurf-openai login)");
+    console.error("[windsurf] chat will return 503 until you log in (windsurf-openai-proxy login)");
   }
   console.error("[windsurf] press Ctrl+C to stop");
 
@@ -148,13 +148,13 @@ async function cmdLogin(): Promise<void> {
   console.error(`[windsurf] signed in as ${result.name}`);
   console.error(`[windsurf] api_key: ${result.apiKey}`);
   console.error(`[windsurf] server:  ${result.apiServerUrl}`);
-  console.error("[windsurf] now run: windsurf-openai serve");
+  console.error("[windsurf] now run: windsurf-openai-proxy serve");
 }
 
 function cmdStatus(): void {
   const c = loadCredentials();
   if (!c) {
-    console.error("[windsurf] not signed in. Run: windsurf-openai login");
+    console.error("[windsurf] not signed in. Run: windsurf-openai-proxy login");
     return;
   }
   console.log(`name:         ${c.name}`);
@@ -213,7 +213,7 @@ function fmtPrice(n: number): string {
 async function cmdRecommend(all: boolean, md = false): Promise<void> {
   const c = loadCredentials();
   if (!c) {
-    console.error("[windsurf] not signed in. Run: windsurf-openai login");
+    console.error("[windsurf] not signed in. Run: windsurf-openai-proxy login");
     return;
   }
   const status = await getUserStatus(c.apiKey, c.apiServerUrl);
@@ -434,7 +434,7 @@ async function cmdRecommend(all: boolean, md = false): Promise<void> {
 async function cmdProbe(): Promise<void> {
   const c = loadCredentials();
   if (!c) {
-    console.error("[windsurf] not signed in. Run: windsurf-openai login");
+    console.error("[windsurf] not signed in. Run: windsurf-openai-proxy login");
     return;
   }
   const host = c.apiServerUrl.replace(/\/$/, "");
@@ -510,7 +510,7 @@ async function main(): Promise<void> {
 }
 
 function printHelp(): void {
-  console.log(`windsurf-openai — standalone OpenAI-compatible proxy for Windsurf/Cognition
+  console.log(`windsurf-openai-proxy — standalone OpenAI-compatible proxy for Windsurf/Cognition
 
 Usage:
   npx tsx cli.ts serve [--port 42100] [--host 127.0.0.1]

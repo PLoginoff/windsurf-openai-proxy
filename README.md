@@ -1,4 +1,4 @@
-# windsurf-openai
+# windsurf-openai-proxy
 
 One zero-dep, **OpenAI-compatible** proxy (also speaks Ollama and llama.cpp) — use your Windsurf/Cognition/Devin subscription models (Claude, GPT, Gemini, Kimi, SWE) in **Zed, Cline or any editor**, with cost tiers, power ranks and multi-key access built in.
 
@@ -6,7 +6,7 @@ The main point of this proxy isn't just bridging the protocol — it's **giving 
 
 Based on [pi-windsurf](https://github.com/ktappdev/pi-windsurf) (originally a Pi extension), reworked into a pure proxy.
 
-![windsurf-openai — Windsurf models in Zed's model picker](screenshot.png)
+![windsurf-openai-proxy — Windsurf models in Zed's model picker](screenshot.png)
 
 ## Why
 

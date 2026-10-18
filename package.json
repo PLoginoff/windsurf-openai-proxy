@@ -1,5 +1,5 @@
 {
-  "name": "windsurf-openai",
+  "name": "windsurf-openai-proxy",
   "version": "0.2.0",
   "description": "Use Windsurf/Cognition/Devin models (Claude, GPT, Gemini, Kimi, SWE) in Zed, Cline or any client — one zero-dep proxy speaking OpenAI, Ollama and llama.cpp protocols, with cost tiers, power ranks and multi-key access built in",
   "author": "ploginoff",
@@ -28,7 +28,7 @@
     "url": "git+https://github.com/ploginoff/windsurf-openai-proxy.git"
   },
   "bin": {
-    "windsurf-openai": "./cli.ts"
+    "windsurf-openai-proxy": "./cli.ts"
   },
   "scripts": {
     "serve": "npx tsx cli.ts serve",

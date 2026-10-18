@@ -116,7 +116,7 @@ async function fetchOrCatalog(): Promise<OrCatalog> {
   try {
     resp = await fetch(OR_MODELS_URL, {
       signal: ac.signal,
-      headers: { "User-Agent": "windsurf-openai (github.com/ploginoff/windsurf-openai-proxy)" },
+      headers: { "User-Agent": "windsurf-openai-proxy (github.com/ploginoff/windsurf-openai-proxy)" },
     });
   } finally {
     clearTimeout(timer);
@@ -277,7 +277,7 @@ export async function fetchSpeedInfo(orId: string): Promise<SpeedInfo> {
   try {
     const resp = await fetch(`https://openrouter.ai/${orId}`, {
       signal: ac.signal,
-      headers: { "User-Agent": "windsurf-openai (github.com/ploginoff/windsurf-openai-proxy)" },
+      headers: { "User-Agent": "windsurf-openai-proxy (github.com/ploginoff/windsurf-openai-proxy)" },
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     html = await resp.text();

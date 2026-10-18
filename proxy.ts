@@ -491,7 +491,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const creds = loadCredentials();
       if (!creds) {
         res.writeHead(503, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Not authenticated. Run `windsurf-openai login` first." }));
+        res.end(JSON.stringify({ error: "Not authenticated. Run `windsurf-openai-proxy login` first." }));
         return;
       }
 
@@ -712,7 +712,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const creds = loadCredentials();
       if (!creds) {
         res.writeHead(503, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: { message: "Not authenticated. Run `windsurf-openai login` first." } }));
+        res.end(JSON.stringify({ error: { message: "Not authenticated. Run `windsurf-openai-proxy login` first." } }));
         return;
       }
 

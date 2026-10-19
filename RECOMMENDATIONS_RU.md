@@ -3,236 +3,288 @@
 > Практические советы по подписке Windsurf Pro (октябрь 2026) + полная таблица моделей.
 > Регенерация таблицы: `npx tsx cli.ts recommend --all --md`; обновление TPS: `npx tsx cli.ts speeds`.
 
+> **⚠ Март 2026:** Windsurf заменил **кредиты за промпт** на **квоту с тарификацией по токенам** (одно 7-дневное окно; «дневная квота исчерпана» в тексте ошибки — то же окно). Поле `creditsPerPrompt` в GetUserStatus — легаси; квоту жжёт именно цена **$/1M токенов** (колонка WS $/1M ниже). «1 кредит» больше не равен одному промпту — списывается ровно столько, сколько токенов съел запрос. У Pro недельный бюджет ≈ **$50** API-токенов.
+
 ## Что реально использовать
 
-**Коротко:** SWE-2 для бесплатной работы, GLM-5.3 Max / Kimi K3 на кредитах подписки, Gemini 3.8 Flash пока промо активно, а фронтлайн-модели (Claude/GPT) докупать в Extra-Usage — там цена рыночная.
+**Коротко:** SWE-2 — бесплатно; GLM-5.3 Flash / GPT-6 Luna / Claude Haiku 5.5 — дёшево на каждый день; GLM-5.3 Max — когда нужен фронтлайн-интеллект за ~$2.6/1M; Claude/GPT докупать в Extra-Usage — по рыночной цене.
 
 1. **Бесплатная рабочая лошадка (`SWE-2 High ★50 free`):**
-   - Стоит **0 кредитов**, пока открыто промо-окно.
-   - Идеальна для рутины: правки, рефакторинг, изучение директорий, запуск инструментов, мелкие баги. Не жгите платные кредиты на простые задачи.
-2. **Лучшее на кредитах подписки (`GLM-5.3 Max ★75 $` и `Kimi K3 High ★76 $`):**
-   - **GLM-5.3 Max** стоит всего **1 кредит за промпт**, показывая топовый бенчмарк-интеллект (★75). Это безоговорочный лидер по соотношению цена/качество на платформе.
-   - **Kimi K3** — отличная альтернатива за 4–6 кредитов, когда нужен другой взгляд.
-   - **Claude Opus 5.5 (45cr)** и **Claude Fable 5.1 (50–175cr)** берегите для самых сложных архитектурных задач.
-3. **Extra-Usage (доплата реальными деньгами после исчерпания кредитов):**
-   - **Можно спокойно покупать в Windsurf:** западные фронтлайн-модели (**Claude Opus/Sonnet 5.5**, **GPT-5.4**, **Gemini 3.8 Flash**) — наценки нет, цены совпадают с OpenRouter и официальными API один в один (Claude Opus 5.5 — $4/$20 за 1M токенов и там, и там).
-   - **НЕ покупайте через Windsurf Extra-Usage:** китайские открытые модели — **GLM-5.3**, **GLM-5.2**, **Kimi K3**. Windsurf накручивает до **20x наценки на входные токены** ($1.40/1M против $0.08/1M на OpenRouter). Если кредиты подписки кончились — переходите на OpenRouter напрямую!
-   - **Исключение:** **GLM-5.3 Flash** — цена в Windsurf ($0.15/$0.5) после подписки вполне ок, примерно на уровне OpenRouter ($0.04/$0.9). Дешёвый и быстрый запасной вариант, когда кредиты кончились.
-   - **Исключение:** **Gemini 3.7/3.8 Flash** — наценки нет ($0.75/$3.75, как на OpenRouter) и ★76 интеллекта. Лучшая по цене/качеству модель для покупки в Extra-Usage, когда промо-окно закроется.
+   - **0 квоты**, пока открыто промо-окно (бесплатные модели вообще не считаются против квоты).
+   - Идеальна для рутины: правки, рефакторинг, изучение директорий, запуск инструментов, мелкие баги. Не жгите недельную квоту на простых задачах.
+2. **Дёшево и умно (`GLM-5.3 Flash Max $`, `GPT-6 Luna $`, `Claude Haiku 5.5 $`):**
+   - **DeepSeek V4 Flash** ~**$0.20/1M** blended — самый дешёвый на платформе.
+   - **Claude Haiku 5.5** ~**$0.26/1M** — почти даром, и это Claude (150tps).
+   - **GPT-6 Luna** ~**$0.26/1M** — второй пик по той же цене.
+   - **GLM-5.3 Flash** ~**$0.29/1M** — лучшее соотношение квота/интеллект в семействе GLM. Быстрая и достаточно умная для основной работы в Zoo/Cline.
+   - **Kimi K2.7** ~**$2.2/1M** — средняя цена, сильный ризонинг.
+3. **Фронтлайн-интеллект (`GLM-5.3 Max ★75 $$`):**
+   - **GLM-5.3 Max** ~**$2.6/1M** blended — топовый интеллект (★75), но в ~9 раз дороже Flash по output. Для действительно сложных задач; для рутины и тул-лупов — оверкилл.
+   - **Claude Opus/Sonnet**, **GPT-5.4** — $5-15/1M blended. Только для архитектурных задач; поберегите недельную квоту.
+4. **Extra-Usage после недельной квоты (доплата реальными $):**
+   - **Можно покупать в Windsurf:** западные фронтлайны (**Claude Opus/Sonnet 5.5**, **GPT-5.4**, **Gemini 3.8 Flash**) — наценки нет, цены совпадают с OpenRouter и официальными API 1:1 (Claude Opus 5.5 — $4/$20 за 1M и там, и там).
+   - **НЕ покупайте через Windsurf Extra-Usage:** китайские открытые модели (**GLM-5.3**, **GLM-5.2**, **Kimi K3**) — наценка **~18x на входных токенах** ($1.40/1M против $0.08/1M на OpenRouter). Кончилась квота — уходите на OpenRouter напрямую!
+   - **Исключение:** **GLM-5.3 Flash** ($0.15/$0.5) — наценка ~2.5-3x на OpenRouter ($0.05/$0.2), но абсолютно дёшево. Быстрый запасной вариант, когда квота вышла.
+   - **Исключение:** **Gemini 3.7/3.8 Flash** — WS $0.75/$3.75: в точности цена OpenRouter на 3.7 и *ниже* OR на 3.8 ($0.83/$4.13), ★76 интеллекта. Лучшая покупка в Extra-Usage, когда промо-окно закроется.
+
+## Как растянуть недельную квоту
+
+Квота считает **токены**, а не промпты — значит рычаг это размер контекста, а не число запросов:
+
+- **Следите за контекстом.** Разговор на 1M токенов жжёт квоту в ~30 раз быстрее, чем на 30k. В агентских тулзах (Zed, Zoo/Cline) каждый тул-колл тащит весь системный промпт + историю — ресетьте чат, когда он распух, а не копите.
+- **Не прыгайте между моделями.** Cache read в ~5 раз дешевле свежего input ($0.26 против $1.4 на GLM-5.3 Max). Смена модели = потеря кэша = перебиллинг всего контекста.
+- **Ретраи бьют дважды.** Неудачный тул-колл с ретраем полного промпта — две дырки в квоте. Чините причину (например, кривой MCP-конфиг), а не гоняйте агент по кругу.
+- **Короткие промпты.** `@`-упоминайте только нужные файлы; 20k input в ~4 раза дешевле 80k на той же модели.
 
 Запускайте `npx tsx cli.ts recommend` в любой момент — получите живую картину по своему аккаунту.
 
+## Текущие фавориты (октябрь 2026)
+
+> **Схема сделки:** Pro (~$15/мес) даёт ~$50/нед квоты ≈ **$217/мес внутренней валюты** — ×14.5 на твои деньги, *если выжигаешь её всю*. WS ещё и накручивает цены на отдельные модели против OpenRouter, поэтому **ж** сворачивает всё в одну цифру: **сколько реального OpenRouter-компьюта покупает каждый $1 подписки при полном выжигании квоты** = ×14.5 ÷ наценка.
+
+Отбор по ЖИРУ (ценность внутри квоты) — где недельный бюджет покупает больше всего реального компьюта:
+
+| Модель | Ранг¹ | WS $/1M in/out | WS÷OR | ж² | Почему здесь |
+| --- | --- | --- | --- | --- | --- |
+| **SWE-2 High** | ★50 | — | — | **∞** | Бесплатно (промо → 1 ноя). Рабочая лошадка рутины — квоту не жрёт |
+| **Gemini 4 Argon** | AA 53 | 1/5 | **×0.5**⁴ | **ж29**⁴ | Новый флагман — цена WS вдвое *ниже* OpenRouter. Чистейший ЖИР — запасайся |
+| **Gemini 3.8 Flash** | ★76 | 0.75/3.75 | ×0.9 | **ж16** | Промо → янв 2027. ★76 по цене *ниже* OpenRouter |
+| **Claude Haiku 5.5** | AA 43, #3/172³ | 0.10/0.50 | ×1.0 | ж14.5 | Claude за копейки, 150 t/s — пробуй |
+| **GPT-6 Luna** | AA 38, #9/172³ | 0.10/0.50 | ×1.0⁴ | ж14.5⁴ | Быстрый дешёвый OpenAI — пробуй (скрыта прокси как Devin Local — включается через tiers.json) |
+| **Claude Sonnet 5.5** | AA 56 | 2/10 | ×1.0 | ж14.5 | Основная рабочая лошадка по рыночной цене |
+| **Claude Opus 5.5** | AA 58 | 4/20 | ×1.0 | ж14.5 | Флагман для сложного — ради него подписка и существует |
+| **GPT-5.4** | ★71 | 2.5/15 | ×1.0 | ж14.5 | Фронтлайн по рыночной цене |
+| **GPT-6 Astra** | ★77 | 10/50 | ×1.0⁴ | ж14.5⁴ | Топ-интеллект, дорого, но честно (скрыта прокси как Devin Local — включается через tiers.json) |
+| **Grok 4.5 Low** | ★72 | 2/6 | ×1.0 | ж14.5 | Сильный мид по рыночной цене |
+| **Claude Sonnet 4.6** | ★63 | 3/15 | ×1.0 | ж14.5 | Проверенная агентная модель |
+| **Kimi K2.7** | ★61 | 0.95/4 | ×1.25 | ж11.6 | Открытый ризонер |
+| **DeepSeek V4 Flash** | ★69 | 0.14/0.28 | ×1.3 | ж11 | Самый дешёвый по blended ($0.20) |
+| **GLM-5.3 Flash** | ★72 | 0.15/0.50 | ×2.7 | ж5.4 | Дешёвый умный fallback, пока есть квота |
+| ⚠️ **GLM-5.3 Max** | ★75 | 1.40/4.40 (кэш 0.26) | **×18 фреш / ×3 кэш** | **ж0.8–ж4.4** | НЕ ЖИР: на свежем инпуте ж0.8 < 1 — прямой OpenRouter выгоднее подписки; кэш-читы поднимают до ж4.4. Только сложные задачи, короткий контекст, не прыгать с модели ради кэша |
+
+¹ ★ = OR/AA coding index (та же шкала, что в полной таблице). «AA» = Artificial Analysis Intelligence Index — другая шкала; для калибровки: Sonnet 5.5 = 56, Opus 5.5 = 58, GLM-5.3 Max = 45. ² **ж** (жир-коэффициент) = сколько реального OpenRouter-компьюта покупает каждый $1 подписки при полном выжигании квоты = (квота ≈$217/мес ÷ $15/мес) × (цена OR ÷ цена WS) ≈ ×14.5 ÷ наценка. ³ У Haiku 5.5 и GPT-6 Luna coding index на OR не опубликован; ранг класса — с artificialanalysis.ai (172 модели в их ценовом тире). ⁴ Ручные оценки: Gemini 4 Argon, GPT-6 Luna и GPT-6 Astra отсутствуют в OR-маппинге прокси — live `recommend` покажет для них «?»; Luna/Astra к тому же скрыты как Devin Local-only (tiers.json их возвращает).
+
+**Правило выбора по ж:** **ж ≥ 10** → жир — жги смело: каждый $ подписки покупает ≥$10 реального OpenRouter-компьюта. **1 ≤ ж < 10** → всё ещё выгоднее прямого OpenRouter, но слабо: каждый доллар квоты покупает тут лишь ж÷14.5 от того, что купил бы на модели с честной ценой — жечь только излишек квоты. **ж < 1** → подписка ПРОИГРЫВАЕТ прямому OpenRouter (GLM-5.3 Max на свежем инпуте: ж0.8) — дефицитную квоту туда не жечь. Живой ж по каждой модели: `npx tsx cli.ts recommend` (нужен доступный OpenRouter).
+
+**Правило большого пальца:** квоту жжём на Claude/GPT/Gemini/Grok (×1.0 — полная субсидия). Китайские опен-весы через WS — только как Flash-фолбэки; как только квота вышла — сразу на OpenRouter напрямую, потому что WS Extra-Usage на GLM Max = платить ×18 наценку живыми деньгами.
+
 ## Все модели
 
-> Снапшот плана **Pro**, 201 модель, сгенерировано 2026-10-14.
+> Снапшот плана **Pro**, 204 модели, сгенерировано 2026-10-18.
 > Регенерация: `npx tsx cli.ts recommend --all --md`.
+> **Март 2026:** кредиты за промпт упразднены — квота биллит токены. «Cost/1M» — главный показатель.
 
-| Tier | Score | Credits | WS $/1M in/out | OR $/1M in/out | Age | TPS | Model |
+| Tier | Score | Cost/1M | WS $/1M in/out | OR $/1M in/out | Age | TPS | Model |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 🟢 FREE | 50 | 0 | - | - | fresh | 100 | SWE-2 Medium |
 | 🟢 FREE | 50 | 0 | - | - | fresh | 100 | SWE-2 High |
+| 🟢 FREE | 50 | 0 | - | - | fresh | 100 | SWE-2 Medium |
 | 🟢 FREE | 50 | 0 | - | - | fresh | 100 | SWE-2 Max |
-| 🟢 PROMO | 76 | 6 | 0.75/3.75 | 0.75/3.75 | fresh | 77 | Gemini 3.7 Flash Low |
-| 🟢 PROMO | 76 | 6 | 0.75/3.75 | 0.75/3.75 | fresh | 77 | Gemini 3.8 Flash Low |
-| 🟢 PROMO | 76 | 8 | 0.75/3.75 | 0.75/3.75 | fresh | 77 | Gemini 3.8 Flash Medium |
-| 🟢 PROMO | 76 | 8 | 0.75/3.75 | 0.75/3.75 | fresh | 77 | Gemini 3.7 Flash Medium |
-| 🟢 PROMO | 76 | 10 | 0.75/3.75 | 0.75/3.75 | fresh | 77 | Gemini 3.7 Flash High |
-| 🟢 PROMO | 76 | 10 | 0.75/3.75 | 0.75/3.75 | fresh | 77 | Gemini 3.8 Flash High |
-| 🟡 | ? | 50 | 1/5 | - | - | - | Gemini 4 Argon Low |
-| 🟡 | ? | 70 | 1/5 | - | - | - | Gemini 4 Argon Medium |
-| 🟡 | ? | 90 | 1/5 | - | - | - | Gemini 4 Argon High |
-| 🟡 | 82 | 40 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5 Low |
-| 🟡 | 82 | 50 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5 Medium |
-| 🟡 | 82 | 70 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5 High |
-| 🟡 | 82 | 80 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5 XHigh |
-| 🔴 | 82 | 100 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5 Max |
-| 🔴 | 82 | 150 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5.1 Low |
-| 🔴 | 82 | 175 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5.1 Medium |
-| 🔴 | 82 | 200 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5.1 High |
-| 🔴 | 82 | 225 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5.1 XHigh |
-| 🔴 | 82 | 250 | 10/50 | 10/50 | fresh | 50 | Claude Fable 5.1 Max |
-| 🟡 | 78 | 75 | 5/25 | 5/25 | fresh | 70 | Claude Opus 5 Low |
-| 🟡 | 78 | 80 | 5/25 | 5/25 | fresh | 70 | Claude Opus 5 Medium |
-| 🔴 | 78 | 115 | 5/25 | 5/25 | fresh | 70 | Claude Opus 5 High |
-| 🔴 | 78 | 150 | 10/50 | 5/25 | fresh | 70 | Claude Opus 5 Low Fast |
-| 🔴 | 78 | 155 | 5/25 | 5/25 | fresh | 70 | Claude Opus 5 XHigh |
-| 🔴 | 78 | 160 | 5/25 | 5/25 | fresh | 70 | Claude Opus 5 Max |
-| 🔴 | 78 | 160 | 10/50 | 5/25 | fresh | 70 | Claude Opus 5 Medium Fast |
-| 🔴 | 78 | 230 | 10/50 | 5/25 | fresh | 70 | Claude Opus 5 High Fast |
-| 🔴 | 78 | 310 | 10/50 | 5/25 | fresh | 70 | Claude Opus 5 XHigh Fast |
-| 🔴 | 78 | 320 | 10/50 | 5/25 | fresh | 70 | Claude Opus 5 Max Fast |
-| 🟡 | 77 | 10 | 2/6 | 2/6 | fresh | 55 | Grok 4.6 Low |
-| 🟡 | 77 | 20 | 2/6 | 2/6 | fresh | 55 | Grok 4.6 Medium |
-| 🟡 | 77 | 25 | 2/6 | 2/6 | fresh | 55 | Grok 4.6 High |
-| 🟡 | 77 | 30 | 2/6 | 2/6 | fresh | 55 | Grok 4.6 XHigh |
-| 🟢 | 76 | 4 | 3/15 | 0.7/15 | fresh | 49 | Kimi K3 Low |
-| 🟢 | 76 | 6 | 3/15 | 0.7/15 | fresh | 49 | Kimi K3 High |
-| 🟢 | 76 | 9 | 3/15 | 0.7/15 | fresh | 49 | Kimi K3 Max |
-| 🟡 | 75 | 9 | 5/30 | 5/30 | fresh | 57 | GPT-5.5 No Thinking |
-| 🟡 | 75 | 12 | 5/30 | 5/30 | fresh | 57 | GPT-5.5 Low Thinking |
-| 🟡 | 75 | 15 | 5/30 | 5/30 | fresh | 57 | GPT-5.5 Medium Thinking |
-| 🟡 | 75 | 22.5 | 12.5/75 | 5/30 | fresh | 57 | GPT-5.5 No Thinking Fast |
-| 🟡 | 75 | 24 | 5/30 | 5/30 | fresh | 57 | GPT-5.5 High Thinking |
-| 🟡 | 75 | 30 | 12.5/75 | 5/30 | fresh | 57 | GPT-5.5 Low Thinking Fast |
-| 🟡 | 75 | 36 | 5/30 | 5/30 | fresh | 57 | GPT-5.5 XHigh Thinking |
-| 🟡 | 75 | 37.5 | 12.5/75 | 5/30 | fresh | 57 | GPT-5.5 Medium Thinking Fast |
-| 🟡 | 75 | 60 | 12.5/75 | 5/30 | fresh | 57 | GPT-5.5 High Thinking Fast |
-| 🟡 | 75 | 90 | 12.5/75 | 5/30 | fresh | 57 | GPT-5.5 XHigh Thinking Fast |
-| 🟢 | 75 | 1 | 1.4/4.4 | 0.08/4.8 | fresh | 85 | GLM-5.3 Low |
-| 🟢 | 75 | 1 | 1.4/4.4 | 0.08/4.8 | fresh | 85 | GLM-5.3 High |
-| 🟢 | 75 | 1 | 1.4/4.4 | 0.08/4.8 | fresh | 85 | GLM-5.3 Max |
-| 🟡 | 74 | 20 | 5/25 | 5/25 | fresh | 76 | Claude Opus 4.8 Low |
-| 🟡 | 74 | 25 | 5/25 | 5/25 | fresh | 76 | Claude Opus 4.8 Medium |
-| 🟡 | 74 | 35 | 5/25 | 5/25 | fresh | 76 | Claude Opus 4.8 High |
-| 🟡 | 74 | 40 | 5/25 | 5/25 | fresh | 76 | Claude Opus 4.8 XHigh |
-| 🟡 | 74 | 40 | 10/50 | 5/25 | fresh | 76 | Claude Opus 4.8 Low Fast |
-| 🟡 | 74 | 50 | 5/25 | 5/25 | fresh | 76 | Claude Opus 4.8 Max |
-| 🟡 | 74 | 50 | 10/50 | 5/25 | fresh | 76 | Claude Opus 4.8 Medium Fast |
-| 🟡 | 74 | 70 | 10/50 | 5/25 | fresh | 76 | Claude Opus 4.8 High Fast |
-| 🟡 | 74 | 80 | 10/50 | 5/25 | fresh | 76 | Claude Opus 4.8 XHigh Fast |
-| 🔴 | 74 | 100 | 10/50 | 5/25 | fresh | 76 | Claude Opus 4.8 Max Fast |
-| 🟡 | 74 | 20 | 5/25 | 5/25 | fresh | 56 | Claude Opus 4.7 Low |
-| 🟡 | 74 | 40 | 5/25 | 5/25 | fresh | 56 | Claude Opus 4.7 Medium |
-| 🟡 | 74 | 60 | 5/25 | 5/25 | fresh | 56 | Claude Opus 4.7 High |
-| 🟡 | 74 | 65 | 5/25 | 5/25 | fresh | 56 | Claude Opus 4.7 XHigh |
-| 🟡 | 74 | 75 | 5/25 | 5/25 | fresh | 56 | Claude Opus 4.7 Max |
-| 🟡 | 72 | 0.1 | 0.3/0.5 | 2/6 | fresh | 54 | xAI Grok-3 mini Thinking |
-| 🟡 | 72 | 1 | 3/15 | 2/6 | fresh | 54 | xAI Grok-3 |
-| 🟡 | 72 | 5 | 2/6 | 2/6 | fresh | 54 | Grok 4.5 Low |
-| 🟡 | 72 | 8 | 2/6 | 2/6 | fresh | 54 | Grok 4.5 Medium |
-| 🟡 | 72 | 10 | 2/6 | 2/6 | fresh | 54 | Grok 4.5 High |
-| 🟢 | 72 | 1 | 0.15/0.5 | 0.04/0.9 | fresh | 67 | GLM-5.3 Flash Low |
-| 🟢 | 72 | 1 | 0.15/0.5 | 0.04/0.9 | fresh | 67 | GLM-5.3 Flash High |
-| 🟢 | 72 | 1 | 0.15/0.5 | 0.04/0.9 | fresh | 67 | GLM-5.3 Flash Max |
-| 🟡 | 72 | 12 | 2/10 | 2/10 | fresh | 71 | Claude Sonnet 5 Low |
-| 🟡 | 72 | 15 | 2/10 | 2/10 | fresh | 71 | Claude Sonnet 5 Medium |
-| 🟡 | 72 | 20 | 2/10 | 2/10 | fresh | 71 | Claude Sonnet 5 High |
-| 🟡 | 72 | 30 | 2/10 | 2/10 | fresh | 71 | Claude Sonnet 5 XHigh |
-| 🟡 | 72 | 40 | 2/10 | 2/10 | fresh | 71 | Claude Sonnet 5 Max |
-| 🟡 | 71 | 1.5 | 2.5/15 | 2.5/15 | aging | 55 | GPT-5.4 No Thinking |
-| 🟡 | 71 | 1.5 | 2.5/15 | 2.5/15 | aging | 55 | GPT-5.4 Low Thinking |
-| 🟡 | 71 | 3 | 2.5/15 | 2.5/15 | aging | 55 | GPT-5.4 Medium Thinking |
-| 🟡 | 71 | 3 | 5/30 | 2.5/15 | aging | 55 | GPT-5.4 No Thinking Fast |
-| 🟡 | 71 | 3 | 5/30 | 2.5/15 | aging | 55 | GPT-5.4 Low Thinking Fast |
-| 🟡 | 71 | 4 | 2.5/15 | 2.5/15 | aging | 55 | GPT-5.4 High Thinking |
-| 🟡 | 71 | 6 | 5/30 | 2.5/15 | aging | 55 | GPT-5.4 Medium Thinking Fast |
-| 🟡 | 71 | 8 | 5/30 | 2.5/15 | aging | 55 | GPT-5.4 High Thinking Fast |
-| 🟡 | 71 | 12 | 2.5/15 | 2.5/15 | aging | 55 | GPT-5.4 XHigh Thinking |
-| 🟡 | 71 | 24 | 5/30 | 2.5/15 | aging | 55 | GPT-5.4 XHigh Thinking Fast |
-|  | 69 | 0.5 | 0.14/0.28 | 0.02/0.64 | fresh | 54 | DeepSeek V4 Flash High |
-|  | 69 | 1 | 0.14/0.28 | 0.02/0.64 | fresh | 54 | DeepSeek V4 Flash Max |
-|  | 69 | 1 | 1.4/4.4 | 0.05/7 | fresh | 66 | GLM-5.2 No Thinking |
-|  | 69 | 1 | 2/12 | 2/12 | aging | 76 | Gemini 3.1 Pro Low Thinking |
-|  | 69 | 1.5 | 1.4/4.4 | 0.05/7 | fresh | 66 | GLM-5.2 High |
-|  | 69 | 2 | 1.4/4.4 | 0.05/7 | fresh | 66 | GLM-5.2 No Thinking 1M |
-|  | 69 | 2 | 2/12 | 2/12 | aging | 76 | Gemini 3.1 Pro High Thinking |
-|  | 69 | 3 | 1.4/4.4 | 0.05/7 | fresh | 66 | GLM-5.2 Max |
-|  | 69 | 3 | 1.4/4.4 | 0.05/7 | fresh | 66 | GLM-5.2 High 1M |
-|  | 69 | 3 | 1.32/3.96 | 0.66/1.98 | fresh | 42 | DeepSeek V4 Pro High |
-|  | 69 | 3 | 1.32/3.96 | 0.66/1.98 | fresh | 42 | DeepSeek V4 Pro Max |
-|  | 69 | 6 | 1.4/4.4 | 0.05/7 | fresh | 66 | GLM-5.2 Max 1M |
-|  | 63 | 4 | 3/15 | 3/15 | aging | 45 | Claude Sonnet 4.6 |
-|  | 63 | 6 | 3/15 | 3/15 | aging | 45 | Claude Sonnet 4.6 Thinking |
-|  | 63 | 12 | 3/15 | 3/15 | aging | 45 | Claude Sonnet 4.6 1M |
-|  | 63 | 16 | 3/15 | 3/15 | aging | 45 | Claude Sonnet 4.6 Thinking 1M |
-|  | 62 | 1 | 0.95/4 | 0.65/3.41 | fresh | 35 | Kimi K2.6 |
-|  | 61 | 1 | 0.95/4 | 0.67/3.35 | fresh | 39 | Kimi K2.7 |
-| 🟡 | 58 | 35 | 4/20 | 4/20 | new | 76 | Claude Opus 5.5 Low |
-| 🟡 | 58 | 45 | 4/20 | 4/20 | new | 76 | Claude Opus 5.5 Medium |
-| 🟡 | 58 | 65 | 4/20 | 4/20 | new | 76 | Claude Opus 5.5 High |
-| 🔴 | 58 | 125 | 4/20 | 4/20 | new | 76 | Claude Opus 5.5 XHigh |
-| 🔴 | 58 | 150 | 4/20 | 4/20 | new | 76 | Claude Opus 5.5 Max |
-| 🔴 | 58 | 150 | 8/40 | 4/20 | new | 76 | Claude Opus 5.5 Low Fast |
-| 🔴 | 58 | 160 | 8/40 | 4/20 | new | 76 | Claude Opus 5.5 Medium Fast |
-| 🔴 | 58 | 230 | 8/40 | 4/20 | new | 76 | Claude Opus 5.5 High Fast |
-| 🔴 | 58 | 310 | 8/40 | 4/20 | new | 76 | Claude Opus 5.5 XHigh Fast |
-| 🔴 | 58 | 320 | 8/40 | 4/20 | new | 76 | Claude Opus 5.5 Max Fast |
-| 🟡 | 56 | 1.5 | 0.75/4.5 | 0.75/4.5 | aging | 83 | GPT-5.4 Mini Low Thinking |
-| 🟡 | 56 | 1.5 | 0.75/4.5 | 0.75/4.5 | aging | 83 | GPT-5.4 Mini Medium Thinking |
-| 🟡 | 56 | 4.5 | 0.75/4.5 | 0.75/4.5 | aging | 83 | GPT-5.4 Mini High Thinking |
-| 🟡 | 56 | 12 | 0.75/4.5 | 0.75/4.5 | aging | 83 | GPT-5.4 Mini XHigh Thinking |
-| 🟡 | 56 | 12 | 2/10 | 2/10 | new | 94 | Claude Sonnet 5.5 Low |
-| 🟡 | 56 | 15 | 2/10 | 2/10 | new | 94 | Claude Sonnet 5.5 Medium |
-| 🟡 | 56 | 20 | 2/10 | 2/10 | new | 94 | Claude Sonnet 5.5 High |
-| 🟡 | 56 | 30 | 2/10 | 2/10 | new | 94 | Claude Sonnet 5.5 XHigh |
-| 🟡 | 56 | 40 | 2/10 | 2/10 | new | 94 | Claude Sonnet 5.5 Max |
-|  | 49 | 1 | 0.6/2.4 | 0.6/2.4 | fresh | 59 | Nemotron 3 Ultra None |
-|  | 49 | 1 | 0.6/2.4 | 0.6/2.4 | fresh | 59 | Nemotron 3 Ultra Medium |
-|  | 49 | 1 | 0.6/2.4 | 0.6/2.4 | fresh | 59 | Nemotron 3 Ultra High |
-|  | 46 | 15 | 2/6 | 2/6 | new | 62 | Grok 4.7 Low |
-|  | 46 | 20 | 2/6 | 2/6 | new | 62 | Grok 4.7 Medium |
-|  | 46 | 30 | 2/6 | 2/6 | new | 62 | Grok 4.7 High |
-|  | 46 | 55 | 2/6 | 2/6 | new | 62 | Grok 4.7 XHigh |
-|  | 43 | 3 | 0.1/0.5 | 0.1/0.5 | new | 150 | Claude Haiku 5.5 Low |
-|  | 43 | 4 | 0.1/0.5 | 0.1/0.5 | new | 150 | Claude Haiku 5.5 Medium |
-|  | 43 | 5 | 0.1/0.5 | 0.1/0.5 | new | 150 | Claude Haiku 5.5 High |
-|  | 43 | 8 | 0.1/0.5 | 0.1/0.5 | new | 150 | Claude Haiku 5.5 XHigh |
-|  | 43 | 10 | 0.1/0.5 | 0.1/0.5 | new | 150 | Claude Haiku 5.5 Max |
-|  | 42 | 3 | 0.5/2.5 | - | aging | 100 | SWE-1.7 Medium |
-|  | 42 | 9 | 0.5/2.5 | - | aging | 100 | SWE-1.7 Max |
-|  | 40 | 2 | 0.22/0.66 | 0.02/0.89 | fresh | 87 | DeepSeek V4.1 Flash High |
-|  | 40 | 3 | 0.22/0.66 | 0.02/0.89 | fresh | 87 | DeepSeek V4.1 Flash Max |
-|  | 39 | 9 | 2.5/12.5 | - | aging | 100 | SWE-1.7 Lightning Medium |
-|  | 39 | 18 | 2.5/12.5 | - | aging | 100 | SWE-1.7 Lightning Max |
-|  | 34 | 2 | 1.5/9 | 1.5/9 | fresh | 128 | Gemini 3.5 Flash Minimal |
-|  | 34 | 2 | 1.5/7.5 | 1.5/9 | fresh | 128 | Gemini 3.6 Flash Minimal |
-|  | 34 | 4 | 1.5/9 | 1.5/9 | fresh | 128 | Gemini 3.5 Flash Low |
-|  | 34 | 4 | 1.5/7.5 | 1.5/9 | fresh | 128 | Gemini 3.6 Flash Low |
-|  | 34 | 8 | 1.5/9 | 1.5/9 | fresh | 128 | Gemini 3.5 Flash Medium |
-|  | 34 | 8 | 1.5/7.5 | 1.5/9 | fresh | 128 | Gemini 3.6 Flash Medium |
-|  | 34 | 9 | 1.5/9 | 1.5/9 | fresh | 128 | Gemini 3.5 Flash High |
-|  | 34 | 9 | 1.5/7.5 | 1.5/9 | fresh | 128 | Gemini 3.6 Flash High |
-|  | 33 | 1 | 1.25/10 | 1.25/10 | aging | 75 | Gemini 2.5 Pro |
-|  | 33 | 3 | 0.5/2.5 | - | aging | 100 | SWE-1.6 |
-|  | 33 | 3 | 0.5/2.5 | - | aging | 100 | SWE-1.6 Fast |
-|  | 33 | 1.5 | 1.75/14 | 1.75/14 | aging | 51 | GPT-5.3-Codex Low |
-|  | 33 | 2 | 1.75/14 | 1.75/14 | aging | 51 | GPT-5.3-Codex Medium |
-|  | 33 | 2.5 | 1.75/14 | 1.75/14 | aging | 51 | GPT-5.3-Codex High |
-|  | 33 | 3 | 1.75/14 | 1.75/14 | aging | 51 | GPT-5.3-Codex X-High |
-|  | 33 | 3 | 3.5/28 | 1.75/14 | aging | 51 | GPT-5.3-Codex Low Fast |
-|  | 33 | 4 | 3.5/28 | 1.75/14 | aging | 51 | GPT-5.3-Codex Medium Fast |
-|  | 33 | 5 | 3.5/28 | 1.75/14 | aging | 51 | GPT-5.3-Codex High Fast |
-|  | 33 | 6 | 3.5/28 | 1.75/14 | aging | 51 | GPT-5.3-Codex XHigh Fast |
-|  | 32 | 6 | 5/25 | 5/25 | aging | 40 | Claude Opus 4.6 |
-|  | 32 | 8 | 5/25 | 5/25 | aging | 40 | Claude Opus 4.6 Thinking |
-|  | 32 | 10 | 5/25 | 5/25 | aging | 40 | Claude Opus 4.6 1M |
-|  | 32 | 12 | 5/25 | 5/25 | aging | 40 | Claude Opus 4.6 Thinking 1M |
-|  | 30 | 1 | 1.75/14 | 1.75/14 | aging | 50 | GPT-5.2 Low Thinking |
-|  | 30 | 1 | 1.75/14 | 1.75/14 | aging | 50 | GPT-5.2 No Thinking |
-|  | 30 | 2 | 1.75/14 | 1.75/14 | aging | 50 | GPT-5.2 Medium Thinking |
-|  | 30 | 2 | 3.5/28 | 1.75/14 | aging | 50 | GPT-5.2 Low Thinking Fast |
-|  | 30 | 2 | 3.5/28 | 1.75/14 | aging | 50 | GPT-5.2 No Thinking Fast |
-|  | 30 | 3 | 1.75/14 | 1.75/14 | aging | 50 | GPT-5.2 High Thinking |
-|  | 30 | 4 | 3.5/28 | 1.75/14 | aging | 50 | GPT-5.2 Medium Thinking Fast |
-|  | 30 | 6 | 3.5/28 | 1.75/14 | aging | 50 | GPT-5.2 High Thinking Fast |
-|  | 30 | 8 | 1.75/14 | 1.75/14 | aging | 50 | GPT-5.2 XHigh Thinking |
-|  | 30 | 16 | 3.5/28 | 1.75/14 | aging | 50 | GPT-5.2 XHigh Thinking Fast |
-|  | 29 | 4 | 5/25 | 5/25 | aging | 47 | Claude Opus 4.5 |
-|  | 29 | 5 | 5/25 | 5/25 | aging | 47 | Claude Opus 4.5 Thinking |
-|  | 26 | 0.8 | 0.5/3 | 0.5/3 | aging | 77 | Gemini 3 Flash Minimal |
-|  | 26 | 1 | 0.5/3 | 0.5/3 | aging | 77 | Gemini 3 Flash Low |
-|  | 26 | 1 | 0.5/3 | 0.5/3 | aging | 77 | Gemini 3 Flash Medium |
-|  | 26 | 1.8 | 0.5/3 | 0.5/3 | aging | 77 | Gemini 3 Flash High |
-|  | 20 | 1 | 2/8 | 2/8 | aging | 40 | o3 |
-|  | 20 | 1 | 2/8 | 2/8 | aging | 40 | o3 High Reasoning |
-|  | 13 | 1 | 2/8 | 2/8 | aging | 80 | GPT-4.1 |
-|  | 8 | 1 | 2.5/10 | 2.5/10 | old | 60 | GPT-4o |
-|  | ? | 0.5 | 1.25/10 | - | - | - | GPT-5 Low Thinking |
-|  | ? | 0.5 | 0.2/1.5 | - | - | - | Grok Code Fast 1 |
-|  | ? | 0.5 | 1.25/10 | - | - | - | GPT-5.1 No Thinking |
-|  | ? | 0.5 | 1.25/10 | - | - | - | GPT-5.1 Low Thinking |
-|  | ? | 1 | 1/5 | - | - | - | Claude Haiku 4.5 |
-|  | ? | 1 | 1.25/10 | - | - | - | GPT-5 Medium Thinking |
-|  | ? | 1 | 1.25/10 | - | - | - | GPT-5.1 Medium Thinking |
-|  | ? | 1 | 2.5/20 | - | - | - | GPT-5.1 No Thinking Fast |
-|  | ? | 1 | 2.5/20 | - | - | - | GPT-5.1 Low Thinking Fast |
-|  | ? | 2 | 1.25/10 | - | - | - | GPT-5 High Thinking |
-|  | ? | 2 | 1.25/10 | - | - | - | GPT-5.1 High Thinking |
-|  | ? | 2 | 2.5/20 | - | - | - | GPT-5.1 Medium Thinking Fast |
+| 🟢 FREE | ? | 0 | 1/5 | - | - | 100 | SWE-2 Medium Lightning |
+| 🟢 FREE | ? | 0 | 1/5 | - | - | 100 | SWE-2 High Lightning |
+| 🟢 FREE | ? | 0 | 1/5 | - | - | 100 | SWE-2 Max Lightning |
+| 🟢 PROMO | ? | 1.95 | 0.75/3.75 | - | - | 77 | Gemini 3.8 Flash Medium |
+| 🟢 PROMO | ? | 1.95 | 0.75/3.75 | - | - | 77 | Gemini 3.7 Flash Low |
+| 🟢 PROMO | ? | 1.95 | 0.75/3.75 | - | - | 77 | Gemini 3.7 Flash Medium |
+| 🟢 PROMO | ? | 1.95 | 0.75/3.75 | - | - | 77 | Gemini 3.7 Flash High |
+| 🟢 PROMO | ? | 1.95 | 0.75/3.75 | - | - | 77 | Gemini 3.8 Flash Low |
+| 🟢 PROMO | ? | 1.95 | 0.75/3.75 | - | - | 77 | Gemini 3.8 Flash High |
+| 🟡 | ? | 2.6 | 1/5 | - | - | - | Gemini 4 Argon Medium |
+| 🟡 | ? | 2.6 | 1/5 | - | - | - | Gemini 4 Argon Low |
+| 🟡 | ? | 2.6 | 1/5 | - | - | - | Gemini 4 Argon High |
+|  | 42 | 1.3 | 0.5/2.5 | - | aging | 100 | SWE-1.7 Max |
+|  | 42 | 1.3 | 0.5/2.5 | - | aging | 100 | SWE-1.7 Medium |
+| 🔴 | 39 | 6.5 | 2.5/12.5 | - | aging | 100 | SWE-1.7 Lightning Max |
+| 🔴 | 39 | 6.5 | 2.5/12.5 | - | aging | 100 | SWE-1.7 Lightning Medium |
+|  | 33 | 1.3 | 0.5/2.5 | - | aging | 100 | SWE-1.6 |
+|  | 33 | 1.3 | 0.5/2.5 | - | aging | 100 | SWE-1.6 Fast |
+|  | ? | 0.2 | 0.14/0.28 | - | - | 54 | DeepSeek V4 Flash High |
+|  | ? | 0.2 | 0.14/0.28 | - | - | 54 | DeepSeek V4 Flash Max |
+|  | ? | 0.26 | 0.1/0.5 | - | - | 150 | Claude Haiku 5.5 Low |
+|  | ? | 0.26 | 0.1/0.5 | - | - | 150 | Claude Haiku 5.5 Medium |
+|  | ? | 0.26 | 0.1/0.5 | - | - | 150 | Claude Haiku 5.5 High |
+|  | ? | 0.26 | 0.1/0.5 | - | - | 150 | Claude Haiku 5.5 XHigh |
+|  | ? | 0.26 | 0.1/0.5 | - | - | 150 | Claude Haiku 5.5 Max |
+| 🟢 | ? | 0.29 | 0.15/0.5 | - | - | 67 | GLM-5.3 Flash Low |
+| 🟢 | ? | 0.29 | 0.15/0.5 | - | - | 67 | GLM-5.3 Flash High |
+| 🟢 | ? | 0.29 | 0.15/0.5 | - | - | 67 | GLM-5.3 Flash Max |
+|  | ? | 0.38 | 0.3/0.5 | - | - | 54 | xAI Grok-3 mini Thinking |
+|  | ? | 0.4 | 0.22/0.66 | - | - | 87 | DeepSeek V4.1 Flash High |
+|  | ? | 0.4 | 0.22/0.66 | - | - | 87 | DeepSeek V4.1 Flash Max |
+|  | ? | 0.72 | 0.2/1.5 | - | - | - | Grok Code Fast 1 |
+|  | ? | 1.32 | 0.6/2.4 | - | - | 59 | Nemotron 3 Ultra None |
+|  | ? | 1.32 | 0.6/2.4 | - | - | 59 | Nemotron 3 Ultra Medium |
+|  | ? | 1.32 | 0.6/2.4 | - | - | 59 | Nemotron 3 Ultra High |
+|  | ? | 1.5 | 0.5/3 | - | - | 77 | Gemini 3 Flash Minimal |
+|  | ? | 1.5 | 0.5/3 | - | - | 77 | Gemini 3 Flash Low |
+|  | ? | 1.5 | 0.5/3 | - | - | 77 | Gemini 3 Flash Medium |
+|  | ? | 1.5 | 0.5/3 | - | - | 77 | Gemini 3 Flash High |
+|  | ? | 2.17 | 0.95/4 | - | - | 35 | Kimi K2.6 |
+|  | ? | 2.17 | 0.95/4 | - | - | 39 | Kimi K2.7 |
+| 🟡 | ? | 2.25 | 0.75/4.5 | - | - | 83 | GPT-5.4 Mini Low Thinking |
+| 🟡 | ? | 2.25 | 0.75/4.5 | - | - | 83 | GPT-5.4 Mini Medium Thinking |
+| 🟡 | ? | 2.25 | 0.75/4.5 | - | - | 83 | GPT-5.4 Mini High Thinking |
+| 🟡 | ? | 2.25 | 0.75/4.5 | - | - | 83 | GPT-5.4 Mini XHigh Thinking |
+|  | ? | 2.38 | 1.32/3.96 | - | - | 42 | DeepSeek V4 Pro High |
+|  | ? | 2.38 | 1.32/3.96 | - | - | 42 | DeepSeek V4 Pro Max |
+|  | ? | 2.6 | 1/5 | - | - | - | Claude Haiku 4.5 |
+|  | ? | 2.6 | 1.4/4.4 | - | - | 66 | GLM-5.2 High |
+| 🟢 | ? | 2.6 | 1.4/4.4 | - | - | 85 | GLM-5.3 Low |
+| 🟢 | ? | 2.6 | 1.4/4.4 | - | - | 85 | GLM-5.3 High |
+| 🟢 | ? | 2.6 | 1.4/4.4 | - | - | 85 | GLM-5.3 Max |
+|  | ? | 2.6 | 1.4/4.4 | - | - | 66 | GLM-5.2 Max |
+|  | ? | 2.6 | 1.4/4.4 | - | - | 66 | GLM-5.2 High 1M |
+|  | ? | 2.6 | 1.4/4.4 | - | - | 66 | GLM-5.2 Max 1M |
+|  | ? | 2.6 | 1.4/4.4 | - | - | 66 | GLM-5.2 No Thinking |
+|  | ? | 2.6 | 1.4/4.4 | - | - | 66 | GLM-5.2 No Thinking 1M |
+|  | ? | 3.6 | 2/6 | - | - | 54 | Grok 4.5 Low |
+|  | ? | 3.6 | 2/6 | - | - | 54 | Grok 4.5 Medium |
+|  | ? | 3.6 | 2/6 | - | - | 54 | Grok 4.5 High |
+| 🟡 | ? | 3.6 | 2/6 | - | - | 55 | Grok 4.6 Low |
+| 🟡 | ? | 3.6 | 2/6 | - | - | 55 | Grok 4.6 Medium |
+| 🟡 | ? | 3.6 | 2/6 | - | - | 55 | Grok 4.6 High |
+| 🟡 | ? | 3.6 | 2/6 | - | - | 55 | Grok 4.6 XHigh |
+|  | ? | 3.6 | 2/6 | - | - | 62 | Grok 4.7 Low |
+|  | ? | 3.6 | 2/6 | - | - | 62 | Grok 4.7 Medium |
+|  | ? | 3.6 | 2/6 | - | - | 62 | Grok 4.7 High |
+|  | ? | 3.6 | 2/6 | - | - | 62 | Grok 4.7 XHigh |
+|  | ? | 3.9 | 1.5/7.5 | - | - | 128 | Gemini 3.6 Flash Minimal |
+|  | ? | 3.9 | 1.5/7.5 | - | - | 128 | Gemini 3.6 Flash Low |
+|  | ? | 3.9 | 1.5/7.5 | - | - | 128 | Gemini 3.6 Flash Medium |
+|  | ? | 3.9 | 1.5/7.5 | - | - | 128 | Gemini 3.6 Flash High |
+| 🔴 | ? | 4.4 | 2/8 | - | - | 80 | GPT-4.1 |
+| 🔴 | ? | 4.4 | 2/8 | - | - | 40 | o3 |
+| 🔴 | ? | 4.4 | 2/8 | - | - | 40 | o3 High Reasoning |
+| 🔴 | ? | 4.5 | 1.5/9 | - | - | 128 | Gemini 3.5 Flash Minimal |
+| 🔴 | ? | 4.5 | 1.5/9 | - | - | 128 | Gemini 3.5 Flash Low |
+| 🔴 | ? | 4.5 | 1.5/9 | - | - | 128 | Gemini 3.5 Flash Medium |
+| 🔴 | ? | 4.5 | 1.5/9 | - | - | 128 | Gemini 3.5 Flash High |
+| 🔴 | ? | 4.75 | 1.25/10 | - | - | - | GPT-5 Low Thinking |
+| 🔴 | ? | 4.75 | 1.25/10 | - | - | 75 | Gemini 2.5 Pro |
+| 🔴 | ? | 4.75 | 1.25/10 | - | - | - | GPT-5 Medium Thinking |
+| 🔴 | ? | 4.75 | 1.25/10 | - | - | - | GPT-5 High Thinking |
+| 🔴 | ? | 4.75 | 1.25/10 | - | - | - | GPT-5.1 No Thinking |
+| 🔴 | ? | 4.75 | 1.25/10 | - | - | - | GPT-5.1 Low Thinking |
+| 🔴 | ? | 4.75 | 1.25/10 | - | - | - | GPT-5.1 Medium Thinking |
+| 🔴 | ? | 4.75 | 1.25/10 | - | - | - | GPT-5.1 High Thinking |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 94 | Claude Sonnet 5.5 Medium |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 71 | Claude Sonnet 5 Low |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 71 | Claude Sonnet 5 Medium |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 71 | Claude Sonnet 5 High |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 71 | Claude Sonnet 5 XHigh |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 71 | Claude Sonnet 5 Max |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 94 | Claude Sonnet 5.5 Low |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 94 | Claude Sonnet 5.5 High |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 94 | Claude Sonnet 5.5 XHigh |
+| 🔴 | ? | 5.2 | 2/10 | - | - | 94 | Claude Sonnet 5.5 Max |
+| 🔴 | ? | 5.5 | 2.5/10 | - | - | 60 | GPT-4o |
+| 🔴 | ? | 6 | 2/12 | - | - | 76 | Gemini 3.1 Pro Low Thinking |
+| 🔴 | ? | 6 | 2/12 | - | - | 76 | Gemini 3.1 Pro High Thinking |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 50 | GPT-5.2 Low Thinking |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 50 | GPT-5.2 Medium Thinking |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 50 | GPT-5.2 No Thinking |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 50 | GPT-5.2 High Thinking |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 50 | GPT-5.2 XHigh Thinking |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 51 | GPT-5.3-Codex Low |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 51 | GPT-5.3-Codex Medium |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 51 | GPT-5.3-Codex High |
+| 🔴 | ? | 6.65 | 1.75/14 | - | - | 51 | GPT-5.3-Codex X-High |
+| 🔴 | ? | 7.5 | 2.5/15 | - | - | 55 | GPT-5.4 No Thinking |
+| 🔴 | ? | 7.5 | 2.5/15 | - | - | 55 | GPT-5.4 Low Thinking |
+| 🔴 | ? | 7.5 | 2.5/15 | - | - | 55 | GPT-5.4 Medium Thinking |
+| 🔴 | ? | 7.5 | 2.5/15 | - | - | 55 | GPT-5.4 High Thinking |
+| 🔴 | ? | 7.5 | 2.5/15 | - | - | 55 | GPT-5.4 XHigh Thinking |
+| 🟢 | ? | 7.8 | 3/15 | - | - | 49 | Kimi K3 High |
+| 🟢 | ? | 7.8 | 3/15 | - | - | 49 | Kimi K3 Low |
+| 🟢 | ? | 7.8 | 3/15 | - | - | 49 | Kimi K3 Max |
+| 🔴 | ? | 7.8 | 3/15 | - | - | 45 | Claude Sonnet 4.6 |
+| 🔴 | ? | 7.8 | 3/15 | - | - | 45 | Claude Sonnet 4.6 Thinking |
+| 🔴 | ? | 7.8 | 3/15 | - | - | 45 | Claude Sonnet 4.6 1M |
+| 🔴 | ? | 7.8 | 3/15 | - | - | 45 | Claude Sonnet 4.6 Thinking 1M |
+| 🔴 | ? | 7.8 | 3/15 | - | - | 54 | xAI Grok-3 |
+| 🔴 | ? | 9.5 | 2.5/20 | - | - | - | GPT-5.1 No Thinking Fast |
+| 🔴 | ? | 9.5 | 2.5/20 | - | - | - | GPT-5.1 Low Thinking Fast |
+| 🔴 | ? | 9.5 | 2.5/20 | - | - | - | GPT-5.1 Medium Thinking Fast |
+| 🔴 | ? | 9.5 | 2.5/20 | - | - | - | GPT-5.1 High Thinking Fast |
+| 🔴 | ? | 10.4 | 4/20 | - | - | 76 | Claude Opus 5.5 Medium |
+| 🔴 | ? | 10.4 | 4/20 | - | - | 76 | Claude Opus 5.5 Low |
+| 🔴 | ? | 10.4 | 4/20 | - | - | 76 | Claude Opus 5.5 High |
+| 🔴 | ? | 10.4 | 4/20 | - | - | 76 | Claude Opus 5.5 XHigh |
+| 🔴 | ? | 10.4 | 4/20 | - | - | 76 | Claude Opus 5.5 Max |
+| 🔴 | ? | 13 | 5/25 | - | - | 56 | Claude Opus 4.7 Medium |
+| 🔴 | ? | 13 | 5/25 | - | - | 56 | Claude Opus 4.7 Low |
+| 🔴 | ? | 13 | 5/25 | - | - | 56 | Claude Opus 4.7 High |
+| 🔴 | ? | 13 | 5/25 | - | - | 56 | Claude Opus 4.7 XHigh |
+| 🔴 | ? | 13 | 5/25 | - | - | 56 | Claude Opus 4.7 Max |
+| 🔴 | ? | 13 | 5/25 | - | - | 76 | Claude Opus 4.8 Medium |
+| 🔴 | ? | 13 | 5/25 | - | - | 76 | Claude Opus 4.8 Low |
+| 🔴 | ? | 13 | 5/25 | - | - | 76 | Claude Opus 4.8 High |
+| 🔴 | ? | 13 | 5/25 | - | - | 76 | Claude Opus 4.8 XHigh |
+| 🔴 | ? | 13 | 5/25 | - | - | 76 | Claude Opus 4.8 Max |
+| 🔴 | ? | 13 | 5/25 | - | - | 70 | Claude Opus 5 Medium |
+| 🔴 | ? | 13 | 5/25 | - | - | 70 | Claude Opus 5 Low |
+| 🔴 | ? | 13 | 5/25 | - | - | 70 | Claude Opus 5 High |
+| 🔴 | ? | 13 | 5/25 | - | - | 70 | Claude Opus 5 XHigh |
+| 🔴 | ? | 13 | 5/25 | - | - | 70 | Claude Opus 5 Max |
+| 🔴 | ? | 13 | 5/25 | - | - | 40 | Claude Opus 4.6 |
+| 🔴 | ? | 13 | 5/25 | - | - | 40 | Claude Opus 4.6 Thinking |
+| 🔴 | ? | 13 | 5/25 | - | - | 40 | Claude Opus 4.6 1M |
+| 🔴 | ? | 13 | 5/25 | - | - | 40 | Claude Opus 4.6 Thinking 1M |
+| 🔴 | ? | 13 | 5/25 | - | - | 47 | Claude Opus 4.5 |
+| 🔴 | ? | 13 | 5/25 | - | - | 47 | Claude Opus 4.5 Thinking |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 50 | GPT-5.2 Low Thinking Fast |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 50 | GPT-5.2 Medium Thinking Fast |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 50 | GPT-5.2 No Thinking Fast |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 50 | GPT-5.2 High Thinking Fast |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 50 | GPT-5.2 XHigh Thinking Fast |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 51 | GPT-5.3-Codex Low Fast |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 51 | GPT-5.3-Codex Medium Fast |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 51 | GPT-5.3-Codex High Fast |
+| 🔴 | ? | 13.3 | 3.5/28 | - | - | 51 | GPT-5.3-Codex XHigh Fast |
+| 🔴 | ? | 15 | 5/30 | - | - | 57 | GPT-5.5 No Thinking |
+| 🔴 | ? | 15 | 5/30 | - | - | 57 | GPT-5.5 Low Thinking |
+| 🔴 | ? | 15 | 5/30 | - | - | 57 | GPT-5.5 Medium Thinking |
+| 🔴 | ? | 15 | 5/30 | - | - | 57 | GPT-5.5 High Thinking |
+| 🔴 | ? | 15 | 5/30 | - | - | 57 | GPT-5.5 XHigh Thinking |
+| 🔴 | ? | 15 | 5/30 | - | - | 55 | GPT-5.4 No Thinking Fast |
+| 🔴 | ? | 15 | 5/30 | - | - | 55 | GPT-5.4 Low Thinking Fast |
+| 🔴 | ? | 15 | 5/30 | - | - | 55 | GPT-5.4 Medium Thinking Fast |
+| 🔴 | ? | 15 | 5/30 | - | - | 55 | GPT-5.4 High Thinking Fast |
+| 🔴 | ? | 15 | 5/30 | - | - | 55 | GPT-5.4 XHigh Thinking Fast |
+| 🔴 | ? | 20.8 | 8/40 | - | - | 76 | Claude Opus 5.5 Low Fast |
+| 🔴 | ? | 20.8 | 8/40 | - | - | 76 | Claude Opus 5.5 Medium Fast |
+| 🔴 | ? | 20.8 | 8/40 | - | - | 76 | Claude Opus 5.5 High Fast |
+| 🔴 | ? | 20.8 | 8/40 | - | - | 76 | Claude Opus 5.5 XHigh Fast |
+| 🔴 | ? | 20.8 | 8/40 | - | - | 76 | Claude Opus 5.5 Max Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5.1 Medium |
+| 🔴 | ? | 26 | 10/50 | - | - | 76 | Claude Opus 4.8 Low Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 76 | Claude Opus 4.8 Medium Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 76 | Claude Opus 4.8 High Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 76 | Claude Opus 4.8 XHigh Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 76 | Claude Opus 4.8 Max Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 70 | Claude Opus 5 Low Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 70 | Claude Opus 5 Medium Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 70 | Claude Opus 5 High Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 70 | Claude Opus 5 XHigh Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 70 | Claude Opus 5 Max Fast |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5 Low |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5 Medium |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5 High |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5 XHigh |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5 Max |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5.1 Low |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5.1 High |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5.1 XHigh |
+| 🔴 | ? | 26 | 10/50 | - | - | 50 | Claude Fable 5.1 Max |
+| 🔴 | ? | 37.5 | 12.5/75 | - | - | 57 | GPT-5.5 No Thinking Fast |
+| 🔴 | ? | 37.5 | 12.5/75 | - | - | 57 | GPT-5.5 Low Thinking Fast |
+| 🔴 | ? | 37.5 | 12.5/75 | - | - | 57 | GPT-5.5 Medium Thinking Fast |
+| 🔴 | ? | 37.5 | 12.5/75 | - | - | 57 | GPT-5.5 High Thinking Fast |
+| 🔴 | ? | 37.5 | 12.5/75 | - | - | 57 | GPT-5.5 XHigh Thinking Fast |
 
+**Cost/1M** — смешанная цена 0.6·input + 0.4·output $/1M; именно её квота и биллит с марта 2026 (токены, не промпты).
+**Маркеры** — 🟢 бесплатно/промо или «бери смело»-семейства (GLM-5.3, Kimi K3), 🟡 мощные по разумной цене (score ≥70 или вручную выбранные семейства), 🔴 >$4/1M blended (денежная яма).
 **Score** — индекс coding/intelligence от Artificial Analysis через OpenRouter (0-100).
-**Маркеры** — 🟢 бесплатно/промо или «бери смело»-семейства (GLM-5.3, Kimi K3), 🟡 мощные по разумной цене (score ≥70 или вручную выбранные семейства — иногда можно), 🔴 ≥100 кредитов/промпт (денежная яма).
-**FREE** — бесплатное промо, как его подаёт Windsurf (линейка SWE). **PROMO** — скидочное окно, но кредиты за промпт всё же списываются.
+**FREE** — бесплатное промо, как его подаёт Windsurf (линейка SWE). **PROMO** — скидочное окно, тарификация по токенам сохраняется.
 **WS $/1M** — цены Windsurf Extra-Usage; **OR $/1M** — ориентир OpenRouter. Оценки SWE — ручные.
 **Age** — дата релиза из OpenRouter: new <1мес, fresh <6мес, aging <18мес, old ≥18мес.
 **TPS** — медиана скорости генерации (токенов/сек) по провайдерам OpenRouter (снапшот speeds.json).

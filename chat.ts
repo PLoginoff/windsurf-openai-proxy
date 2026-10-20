@@ -13,6 +13,7 @@ import {
 } from "./wire";
 import { buildMetadata } from "./metadata";
 import { getCachedUserJwt } from "./auth";
+import { scrubToolDef, looksLikeToolBlockError } from "./toolblock";
 
 // ----------------------------------------------------------------------------
 // Types
@@ -204,12 +205,15 @@ export function sanitizeToolSchema(schema: Record<string, unknown>): Record<stri
 }
 
 function encodeToolDef(tool: ToolDef): Buffer {
-  const rawDesc = tool.description ?? "";
+  // scrubToolDef rewrites Cognition-blocklisted phrases (see toolblock.ts);
+  // sanitizeToolSchema flattens type unions their Gemini routing rejects.
+  const scrubbed = scrubToolDef(tool);
+  const rawDesc = scrubbed.description ?? "";
   const desc = rawDesc.length > MAX_TOOL_DESC_LEN
     ? rawDesc.slice(0, MAX_TOOL_DESC_LEN - 24) + "\n…(truncated for cloud)"
     : rawDesc;
-  const params = tool.parameters && typeof tool.parameters === "object"
-    ? sanitizeToolSchema(tool.parameters as Record<string, unknown>)
+  const params = scrubbed.parameters && typeof scrubbed.parameters === "object"
+    ? sanitizeToolSchema(scrubbed.parameters as Record<string, unknown>)
     : {};
   return Buffer.concat([
     encodeString(1, tool.name),
@@ -366,7 +370,7 @@ function decodeUsageBlock(buf: Buffer): CloudChatEvent | null {
     for (const sf of iterFields(f.value as Buffer)) {
       if (debug) {
         const v = Buffer.isBuffer(sf.value)
-          ? /[^ -~]/.test(sf.value.toString("latin1")) ? `hex:${sf.value.toString("hex").slice(0, 24)}` : sf.value.toString("utf8").slice(0, 40)
+          ? /[^ -~]/.test(sf.value.toString("latin1")) ? `hex:${sf.value.toString("hex").slice(0, 64)}` : sf.value.toString("utf8").slice(0, 80)
           : String(sf.value);
         console.error(`[windsurf] usage entry field num=${sf.num} wire=${sf.wire} val=${v}`);
       }
@@ -418,7 +422,10 @@ const CHAT_RETRY_DELAY_MS = 700;
 /** streamChatEvents with up to 2 retries on transient Cognition errors
  *  ("There is an issue with this request" / internal errors). Only retries
  *  if nothing has been yielded to the client yet — mid-stream restarts
- *  would duplicate output. */
+ *  would duplicate output.
+ *
+ *  Tool-description blocklist phrases are scrubbed upfront in encodeToolDef
+ *  (toolblock.ts) — no retry needed for them. */
 export async function* streamChatEventsWithRetry(req: CloudChatRequest): AsyncGenerator<CloudChatEvent> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= CHAT_RETRIES; attempt++) {

@@ -10,12 +10,13 @@ import * as fs from "fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { streamChatEventsWithRetry, CloudChatError, type ChatHistoryItem, type ToolDef } from "./chat";
 import { loadCredentials } from "./oauth";
-import { authenticateKey, creditLimit, type KeyPolicy } from "./keys";
+import { authenticateKey, priceLimit, type KeyPolicy } from "./keys";
 import { getCachedCatalog } from "./catalog";
 import { getUserStatus, getCachedUserStatus, isPromoActive, isActuallyFreePromo, type UserStatusModel } from "./status";
-import { stripCostAnnotation, tierAnnotation, tierFromCredits, userTierOverride, isBlockedModel, titleizeModelId, type PriceTier, type UsageSummary } from "./costs";
+import { stripCostAnnotation, tierAnnotation, tierFromCredits, tierFromPricing, blendedPricePer1M, userTierOverride, isBlockedModel, titleizeModelId, type PriceTier, type UsageSummary } from "./costs";
 import { FEATURED_UIDS } from "./featured";
-import { powerScore } from "./ranks";
+import { powerScore, fatK } from "./ranks";
+import { looksLikeToolBlockError } from "./toolblock";
 
 const WINDSURF_PROXY_HOST = "127.0.0.1";
 const WINDSURF_PROXY_PORT = 42100;
@@ -111,6 +112,9 @@ function tierForLiveModel(m: UserStatusModel): PriceTier {
   if (override !== undefined && override !== "blocked") return override;
   if (isActuallyFreePromo(m)) return "free";
   if (isPromoActive(m)) return "promo";
+  // Since March 2026 quotas bill per-token ($/1M from f32), not per-prompt
+  // credits — tier by the real token price. f3 creditsPerPrompt is legacy.
+  if (m.pricing) return tierFromPricing(m.pricing);
   if (m.creditsPerPrompt !== undefined) return tierFromCredits(m.creditsPerPrompt);
   return "unknown";
 }
@@ -121,7 +125,17 @@ async function rankAnnotation(uid: string): Promise<string> {
   return score !== undefined ? ` ★${Math.round(score)}` : "";
 }
 
-export async function buildModelList(maxCredits?: number): Promise<ModelListItem[]> {
+/** Ж badge for a model: " ж29" or "" when OR price is unknown. */
+async function zhirAnnotation(uid: string, wsIn?: number, wsOut?: number): Promise<string> {
+  const status = getCachedUserStatus();
+  const quotaWeekly = status?.quota?.limit !== undefined ? Number(status.quota.limit) : undefined;
+  const k = await fatK(uid, wsIn, wsOut, { quotaWeeklyUsd: quotaWeekly });
+  if (k === undefined) return "";
+  const rounded = k >= 100 ? Math.round(k) : Math.round(k * 10) / 10;
+  return ` ж${rounded}`;
+}
+
+export async function buildModelList(maxPrice?: number): Promise<ModelListItem[]> {
   const out: ModelListItem[] = [];
   const seen = new Set<string>();
   const push = (uid: string, label: string, tier: PriceTier, contextWindow?: number): void => {
@@ -130,14 +144,13 @@ export async function buildModelList(maxCredits?: number): Promise<ModelListItem
     out.push({ id: label, name: label, canonical: uid, tier, ...(contextWindow ? { contextWindow } : {}) });
   };
 
-  // Per-key filter: with a max_credits limit, only models costing ≤ limit
-  // credits/prompt are listed. Real 0-credit free promo (SWE line) costs 0.
-  // Promo models with >0 credits (like Gemini Flash at 6-10cr) are evaluated
-  // by their actual creditsPerPrompt.
+  // Per-key filter: with a max_price limit, only models whose Windsurf input
+  // price ($/1M) is ≤ limit are listed. Real quota-free promo always passes.
   const withinLimit = (m: UserStatusModel): boolean => {
-    if (maxCredits === undefined) return true;
+    if (maxPrice === undefined) return true;
     if (isActuallyFreePromo(m)) return true;
-    return (m.creditsPerPrompt ?? 0) <= maxCredits;
+    const price = m.pricing?.input ?? 0;
+    return price <= maxPrice;
   };
 
   // Live account data — GetUserStatus (the endpoint the Windsurf plugin uses):
@@ -153,7 +166,7 @@ export async function buildModelList(maxCredits?: number): Promise<ModelListItem
         for (const m of status.models.values()) {
           if (m.disabled || isBlockedModel(m.uid) || !withinLimit(m)) continue;
           const tier = tierForLiveModel(m);
-          const label = `${featuredIndent(m.uid)}${m.label}${await rankAnnotation(m.uid)}${tierAnnotation(tier)}`;
+          const label = `${featuredIndent(m.uid)}${m.label}${await rankAnnotation(m.uid)}${await zhirAnnotation(m.uid, m.pricing?.input, m.pricing?.output)}${tierAnnotation(tier)}`;
           push(m.uid, label, tier, m.contextWindow);
         }
       }
@@ -169,7 +182,7 @@ export async function buildModelList(maxCredits?: number): Promise<ModelListItem
             if (entry.disabled || isBlockedModel(uid)) continue;
             const tier = asTier(userTierOverride(uid));
             const base = entry.label && entry.label !== uid ? entry.label : titleizeModelId(uid);
-            push(uid, `${featuredIndent(uid)}${base}${await rankAnnotation(uid)}${tierAnnotation(tier)}`, tier);
+            push(uid, `${featuredIndent(uid)}${base}${await rankAnnotation(uid)}${await zhirAnnotation(uid)}${tierAnnotation(tier)}`, tier);
           }
         }
       } catch {}
@@ -224,7 +237,45 @@ function logCost(modelId: string, usage: UsageSummary | null, keyPolicy?: KeyPol
   if (!usage) return;
   const fmt = (n?: number) => (n ?? 0).toLocaleString("en-US");
   const who = keyPolicy?.name ? ` [${keyPolicy.name}]` : "";
-  console.error(`[windsurf] ${modelId}  in=${fmt(usage.promptTokens)} out=${fmt(usage.completionTokens)}  (${tierForModel(modelId)})${who}`);
+  // Expected $ at WS list prices (cache-read discounted). Diff against the
+  // quota line logged by logBalance() to validate how the weekly budget is
+  // actually metered — estimate and quota delta should match.
+  const p = getCachedUserStatus()?.models.get(modelId)?.pricing;
+  let est = "";
+  if (p && (p.input ?? 0) > 0) {
+    const cached = usage.cachedInputTokens ?? 0;
+    const fresh = Math.max(0, (usage.promptTokens ?? 0) - cached);
+    const cost = fresh / 1e6 * (p.input ?? 0)
+      + cached / 1e6 * (p.cachedInput ?? 0)
+      + (usage.completionTokens ?? 0) / 1e6 * (p.output ?? 0);
+    est = `  ≈$${cost.toFixed(4)}`;
+  }
+  console.error(`[windsurf] ${modelId}  in=${fmt(usage.promptTokens)} out=${fmt(usage.completionTokens)} cached=${fmt(usage.cachedInputTokens)}${est}  (${tierForModel(modelId)})${who}`);
+}
+
+// Refresh GetUserStatus after a chat and report the plan credit pool (f7).
+// We can't see per-request credit deductions, but watching the pool value
+// between requests reveals the real cost (including retries that fail silently).
+let lastQuotaUsedCents: number | null = null;
+
+function logBalance(creds: { apiKey: string; apiServerUrl: string }): void {
+  getUserStatus(creds.apiKey, creds.apiServerUrl, undefined, { force: true })
+    .then((s) => {
+      const q = s.quota;
+      if (q) {
+        const end = q.windowEnd ? new Date(q.windowEnd * 1000).toISOString().slice(0, 16) : "?";
+        // f15 = weekly $ budget; f16 = remaining balance in cents (signed).
+        // Used = limit*100 - balance_cents. Observed: -5874¢ = $58.74 overdraft.
+        const usedCents = Number(q.limit) * 100 - Number(q.balance);
+        const delta = lastQuotaUsedCents !== null ? usedCents - lastQuotaUsedCents : null;
+        lastQuotaUsedCents = usedCents;
+        const dstr = delta !== null && delta !== 0 ? `  (Δ $${(delta / 100).toFixed(4)} since last request)` : "";
+        console.error(`[windsurf] quota: $${(usedCents / 100).toFixed(2)} of $${q.limit} used this week${dstr} (resets ${end})`);
+      } else {
+        console.error(`[windsurf] plan ${s.planName ?? "?"}: no quota block parsed`);
+      }
+    })
+    .catch(() => { /* quota exhausted or network — skip silently */ });
 }
 
 function openAIError(status: number, message: string, details?: string): object {
@@ -331,14 +382,14 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     // requires the Bearer key.
     if (req.method === "GET" && (url.pathname === "/v1/models" || url.pathname === "/models")) {
       // If the client sent a Bearer key (or path prefix /k/<key> or query param) from keys.json
-      // with a max_credits limit, filter the list to models within that budget.
+      // with a max_price limit, filter the list to models within that budget.
       const presented = extractBearerOrQueryKey(req, rawUrl, pathKey);
-      let maxCredits: number | undefined;
+      let maxPrice: number | undefined;
       if (presented) {
         const policy = authenticateKey(presented);
-        if (policy) maxCredits = creditLimit(policy);
+        if (policy) maxPrice = priceLimit(policy);
       }
-      const items = await buildModelList(maxCredits);
+      const items = await buildModelList(maxPrice);
       const created = Math.floor(Date.now() / 1000);
       const data = items.map(m => ({
         id: m.id,
@@ -391,12 +442,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     // Same data as /v1/models in Ollama's shape; honors the key policy for filtering.
     if (req.method === "GET" && url.pathname === "/api/tags") {
       const presented = extractBearerOrQueryKey(req, rawUrl, pathKey);
-      let maxCredits: number | undefined;
+      let maxPrice: number | undefined;
       if (presented) {
         const policy = authenticateKey(presented);
-        if (policy) maxCredits = creditLimit(policy);
+        if (policy) maxPrice = priceLimit(policy);
       }
-      const items = await buildModelList(maxCredits);
+      const items = await buildModelList(maxPrice);
       const modified = new Date().toISOString();
       const models = items.map(m => ({
         name: m.id,
@@ -503,15 +554,16 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       }
 
       // Per-key model restriction (same rule as the OpenAI endpoint)
-      const keyLimit = keyPolicy ? creditLimit(keyPolicy) : undefined;
+      // Per-key model restriction by Windsurf input $/1M (free promo always passes)
+      const keyLimit = keyPolicy ? priceLimit(keyPolicy) : undefined;
       if (keyLimit !== undefined) {
         const status = getCachedUserStatus();
         const m = status?.models.get(modelUid);
-        const credits = m?.creditsPerPrompt ?? 0;
+        const price = m?.pricing?.input ?? 0;
         const isFree = m ? isActuallyFreePromo(m) : false;
-        if (!isFree && credits > keyLimit) {
+        if (!isFree && price > keyLimit) {
           res.writeHead(403, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: `Model not allowed for this key: costs ${credits} credits/prompt, limit is ${keyLimit}. Pick a cheaper model.` }));
+          res.end(JSON.stringify({ error: `Model not allowed for this key: input $${price}/1M exceeds limit $${keyLimit}/1M. Pick a cheaper model.` }));
           return;
         }
       }
@@ -636,7 +688,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
           logCost(modelUid, usage, keyPolicy);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "Unknown error";
-          console.error(`[windsurf] CHAT ERROR (${modelUid}): ${errorMessage}`);
+          // Blocklist rejections look mysterious in logs — add a one-line hint.
+          const hint = looksLikeToolBlockError(errorMessage)
+            ? " (tool-description blocklist hit — extend POISON_PHRASES in toolblock.ts)"
+            : "";
+          console.error(`[windsurf] CHAT ERROR (${modelUid}): ${errorMessage}${hint}`);
           // A bare {error} line breaks Zed's line parser (ChatResponseDelta):
           // send the error as a final assistant message instead.
           try {
@@ -683,6 +739,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
           ...(usage ? { prompt_eval_count: usage.promptTokens ?? 0, eval_count: usage.completionTokens ?? 0 } : {}),
         }));
         logCost(modelUid, usage, keyPolicy);
+        logBalance(creds);
       }
       return;
     }
@@ -724,16 +781,16 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         return;
       }
 
-      // Per-key model restriction: max credits-per-prompt (SWE free always passes)
-      const keyLimit = keyPolicy ? creditLimit(keyPolicy) : undefined;
+      // Per-key model restriction by Windsurf input $/1M (free promo always passes)
+      const keyLimit = keyPolicy ? priceLimit(keyPolicy) : undefined;
       if (keyLimit !== undefined) {
         const status = getCachedUserStatus();
         const m = status?.models.get(modelUid);
-        const credits = m?.creditsPerPrompt ?? 0;
+        const price = m?.pricing?.input ?? 0;
         const isFree = m ? isActuallyFreePromo(m) : false;
-        if (!isFree && credits > keyLimit) {
+        if (!isFree && price > keyLimit) {
           res.writeHead(403, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: { message: `Model not allowed for this key: costs ${credits} credits/prompt, limit is ${keyLimit}. Pick a cheaper model.`, type: "windsurf_error" } }));
+          res.end(JSON.stringify({ error: { message: `Model not allowed for this key: input $${price}/1M exceeds limit $${keyLimit}/1M. Pick a cheaper model.`, type: "windsurf_error" } }));
           return;
         }
       }
@@ -824,9 +881,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
           res.write("data: [DONE]\n\n");
           res.end();
           logCost(modelUid, usage, keyPolicy);
+          logBalance(creds);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "Unknown error";
-          console.error(`[windsurf] CHAT ERROR (${modelUid}): ${errorMessage}`);
+          const hint = looksLikeToolBlockError(errorMessage)
+            ? " (tool-description blocklist hit — extend POISON_PHRASES in toolblock.ts)"
+            : "";
+          console.error(`[windsurf] CHAT ERROR (${modelUid}): ${errorMessage}${hint}`);
           try {
             res.write(`data: ${JSON.stringify({ error: { message: errorMessage } })}\n\n`);
             const fChunk = { id: responseId, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: requestBody.model ?? modelUid, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] };
@@ -878,6 +939,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(resp));
         logCost(modelUid, usage, keyPolicy);
+        logBalance(creds);
       }
       return;
     }

@@ -52,6 +52,21 @@ export function isActuallyFreePromo(m: UserStatusModel, now = Date.now()): boole
 export interface UserStatus {
   models: Map<string, UserStatusModel>;
   planName?: string;
+  /** Numeric plan fields seen in the plan block (top-level f2). f7 on Pro is
+   *  the monthly prompt-credit pool (observed 16384). We keep every numeric
+   *  field raw so balance fields can be identified across plan types. */
+  planFields: Map<number, bigint>;
+  /** plan.f7 — total prompt-credit pool for the period, when present. */
+  planCreditPool?: bigint;
+  /** Weekly usage-quota window (userStatus.f13). The "daily usage quota
+   *  exhausted" error actually refers to this 7-day window. */
+  quota?: {
+    limit: bigint;        // f15 — weekly credit allowance (observed 50 on Pro)
+    balance: bigint;      // f16 — signed int64 remaining; negative = overdrawn
+    used: bigint;         // derived: limit - balance
+    windowStart?: number; // f17 epoch seconds
+    windowEnd?: number;   // f18 epoch seconds
+  };
   fetchedAt: number;
 }
 
@@ -129,6 +144,7 @@ function parseModelEntry(buf: Buffer): UserStatusModel | null {
 /** Parse a raw GetUserStatus response body. Exported for tests/probes. */
 export function parseUserStatusBuffer(buf: Buffer): UserStatus {
   const models = new Map<string, UserStatusModel>();
+  const planFields = new Map<number, bigint>();
   let planName: string | undefined;
 
   for (const f of iterFields(buf)) {
@@ -144,16 +160,45 @@ export function parseUserStatusBuffer(buf: Buffer): UserStatus {
         }
       }
     } else if (f.num === 2) {
-      // Plan info: f2 = plan name ("Pro")
+      // Plan info: f2 = plan name ("Pro"). Also capture every top-level
+      // varint field so credit-pool/quota fields can be correlated later.
       for (const sf of iterFields(f.value as Buffer)) {
         if (sf.num === 2 && sf.wire === 2 && Buffer.isBuffer(sf.value)) {
           planName = (sf.value as Buffer).toString("utf8");
+        } else if (sf.wire === 0 && typeof sf.value === "bigint") {
+          planFields.set(sf.num, sf.value);
         }
       }
     }
   }
 
-  return { models, planName, fetchedAt: Date.now() };
+  // userStatus.f13 = quota block: f15 weekly limit, f16 = u64_wraparound
+  // encoding of units used (real used = 2^64 - f16), f17/f18 window bounds.
+  let quota: UserStatus["quota"];
+  for (const f of iterFields(buf)) {
+    if (f.num !== 1 || !Buffer.isBuffer(f.value)) continue;
+    for (const sf of iterFields(f.value as Buffer)) {
+      if (sf.num !== 13 || !Buffer.isBuffer(sf.value)) continue;
+      let limit: bigint | undefined;
+      let balanceRaw: bigint | undefined;
+      let windowStart: number | undefined;
+      let windowEnd: number | undefined;
+      for (const qf of iterFields(sf.value as Buffer)) {
+        if (qf.wire !== 0 || typeof qf.value !== "bigint") continue;
+        if (qf.num === 15) limit = qf.value;
+        else if (qf.num === 16) balanceRaw = qf.value;
+        else if (qf.num === 17) windowStart = Number(qf.value);
+        else if (qf.num === 18) windowEnd = Number(qf.value);
+      }
+      if (limit !== undefined && balanceRaw !== undefined) {
+        // f16 is a signed int64 encoded as u64 varint — convert back.
+        const balance = balanceRaw >= (1n << 63n) ? balanceRaw - (1n << 64n) : balanceRaw;
+        quota = { limit, balance, used: limit - balance, windowStart, windowEnd };
+      }
+    }
+  }
+
+  return { models, planName, planFields, planCreditPool: planFields.get(7), quota, fetchedAt: Date.now() };
 }
 
 async function fetchUserStatus(apiKey: string, host: string, signal?: AbortSignal): Promise<UserStatus> {
@@ -185,9 +230,12 @@ async function fetchUserStatus(apiKey: string, host: string, signal?: AbortSigna
   return parseUserStatusBuffer(Buffer.from(await resp.arrayBuffer()));
 }
 
-export async function getUserStatus(apiKey: string, host: string, signal?: AbortSignal): Promise<UserStatus> {
-  if (cached && Date.now() - cached.fetchedAt < STATUS_TTL_MS) return cached;
-  if (inFlight) return inFlight;
+export async function getUserStatus(apiKey: string, host: string, signal?: AbortSignal, opts?: { force?: boolean }): Promise<UserStatus> {
+  if (!opts?.force && cached && Date.now() - cached.fetchedAt < STATUS_TTL_MS) return cached;
+  if (!opts?.force && inFlight) return inFlight;
+  if (opts?.force && inFlight) {
+    try { await inFlight; } catch { /* stale refresh failed; continue */ }
+  }
   const promise = fetchUserStatus(apiKey, host, signal).then((result) => {
     cached = result;
     return result;

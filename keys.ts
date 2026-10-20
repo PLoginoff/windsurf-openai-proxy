@@ -2,14 +2,14 @@
  * Multi-key access control — keys.json next to the CLI.
  *
  *   {
- *     "my-secret-key": { "name": "me",           "max_credits": -1 },
- *     "vasya-key":     { "name": "friend-vasya", "max_credits": 10 }
+ *     "my-secret-key": { "name": "me",           "max_price": -1 },
+ *     "vasya-key":     { "name": "friend-vasya", "max_price": 1.0 }
  *   }
  *
  * Top-level key = the Bearer token clients send. `name` is only for the
- * serve startup log. max_credits limits the model list and chat to models
- * costing ≤ that many credits/prompt; free/promo always pass.
- *   -1 or missing = unlimited, 0 = free/promo only, N = ≤N credits/prompt.
+ * serve startup log. max_price limits the model list and chat to models
+ * whose Windsurf input price ($/1M) is ≤ that value; free/promo always pass.
+ *   -1 or missing = unlimited, 0 = free/promo only, N = ≤N $/1M input.
  * Missing keys.json → localhost only, remote requests rejected.
  */
 import * as fs from "fs";
@@ -18,8 +18,8 @@ import * as path from "path";
 export interface KeyPolicy {
   /** Human label — used only in the serve startup log. */
   name?: string;
-  /** Max credits-per-prompt allowed. -1/undefined = unlimited, 0 = free/promo only. */
-  max_credits?: number;
+  /** Max Windsurf input $/1M allowed. -1/undefined = unlimited, 0 = free/promo only. */
+  max_price?: number;
 }
 
 let cache: Map<string, KeyPolicy> | null = null;
@@ -57,9 +57,9 @@ export function keyCount(): number {
   return loadKeys().size;
 }
 
-/** Resolve the effective credit limit for a policy. undefined = unlimited. */
-export function creditLimit(policy: KeyPolicy): number | undefined {
-  const m = policy.max_credits;
+/** Resolve the effective price limit for a policy. undefined = unlimited. */
+export function priceLimit(policy: KeyPolicy): number | undefined {
+  const m = policy.max_price;
   return m === undefined || m < 0 ? undefined : m;
 }
 

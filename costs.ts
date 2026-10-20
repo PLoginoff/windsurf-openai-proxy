@@ -19,14 +19,41 @@ export interface UsageSummary {
 }
 
 /**
- * Tier from Windsurf's own credits-per-prompt (GetUserStatus).
- * Observed range: GLM=1 … GPT-6 Astra=200.
- * The ONLY source allowed to say "free" (together with active promo windows).
+ * Tier from Windsurf's own credits-per-prompt (GetUserStatus f3).
+ * @deprecated Since March 2026 Windsurf moved to a token-based quota system —
+ * credits-per-prompt is a legacy field. Prefer tierFromPricing() which uses
+ * the real $/1M token prices (f32) that the quota actually meters.
  */
 export function tierFromCredits(credits: number): PriceTier {
   if (credits <= 0) return "free";
   if (credits < 10) return "$";
   if (credits < 100) return "$$";
+  return "$$$";
+}
+
+/** Rough blended $/1M across a typical coding session (30k in + 2k out).
+ *  Output weight is higher because generation is what costs money. */
+export function blendedPricePer1M(p: { input?: number; output?: number }): number | undefined {
+  if (p.input === undefined && p.output === undefined) return undefined;
+  const inp = p.input ?? 0;
+  const out = p.output ?? inp * 4; // output usually ~3-5x input price
+  // weight: ~94% input tokens, ~6% output tokens by volume in agentic flows,
+  // but output drives ~40% of spend at 4-8x price — blend 60/40 by cost share.
+  return inp * 0.6 + out * 0.4;
+}
+
+/** Tier from real $/1M token prices (GetUserStatus f32) — what the quota
+ *  system actually bills since March 2026. Thresholds tuned so GLM-5.3 Flash
+ *  ($0.15/$0.5) lands at $, GLM-5.3 Max ($1.4/$4.4) at $$, Claude ($5/$25) at $$$. */
+export function tierFromPricing(p: { input?: number; output?: number }): PriceTier {
+  const blended = blendedPricePer1M(p);
+  if (blended === undefined) return "unknown";
+  // Buckets roughly matching the Windsurf plugin's color hints:
+  //   $   ≲ $1/1M blended  (GLM-5.3 Flash, GPT-6 Luna, DeepSeek Flash)
+  //   $$  ≲ $4/1M blended  (GLM-5.3 Max, GPT-5.x, Grok 4.5, Gemini Pro)
+  //   $$$ >  $4/1M blended (Claude Opus/Sonnet, GPT-5.4 Fast, Grok 4.6)
+  if (blended < 1.0) return "$";
+  if (blended < 4.0) return "$$";
   return "$$$";
 }
 
@@ -41,9 +68,10 @@ export function tierAnnotation(tier: PriceTier): string {
  */
 export function stripCostAnnotation(s: string): string {
   return s
-    // current format: "Name ★76 $" — bare tier after the rank
+    // current format: "Name ★76 ж29 $" — tier after rank and fat coefficient
     .replace(/\s+\${1,3}\s*$/, "")
     .replace(/\s+(free|promo|unknown)\s*$/, "")
+    .replace(/\s+ж[\d∞]+\s*$/, "")                           // fat coefficient " ж29" / " ж∞"
     // legacy parenthesized format: "Name ($)" / "Name ★76 ($)"
     .replace(/\s*\(\${1,3}\)\s*$/, "")
     .replace(/\s*\((free|promo|unknown|plan|included)\)\s*$/, "")

@@ -14,6 +14,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
+import { blendedPricePer1M } from "./costs";
 
 export interface OrModelInfo {
   orId: string;
@@ -349,6 +350,41 @@ const MANUAL_SCORES: Record<string, number> = {
 
 export function manualScore(uid: string): number | undefined {
   return MANUAL_SCORES[baseUid(uid)];
+}
+
+// ----------------------------------------------------------------------------
+// Ж (fat coefficient) — real OpenRouter compute per $1 of subscription.
+// Ж = (quota $/mo ÷ plan $/mo) × (blended OR price ÷ blended WS price)
+//   ≈ ×14.5 ÷ markup on Pro ($50/wk quota, $15/mo plan).
+// Ж ≥ 10 → burn freely; Ж < 1 → OpenRouter direct beats the subscription.
+// ----------------------------------------------------------------------------
+
+export interface FatKParams {
+  /** Weekly quota limit in USD (from GetUserStatus f15). */
+  quotaWeeklyUsd?: number;
+  /** Plan price in USD/mo (Pro = 15). */
+  planUsdPerMo?: number;
+}
+
+const DEFAULT_PLAN_USD_PER_MO = 15;
+const WEEKS_PER_MO = 365.25 / 7 / 12;
+
+/** Ж for a model: undefined when WS or OR price is unknown. */
+export async function fatK(
+  uid: string,
+  wsIn: number | undefined,
+  wsOut: number | undefined,
+  params?: FatKParams,
+): Promise<number | undefined> {
+  const ws = blendedPricePer1M({ input: wsIn, output: wsOut });
+  if (ws === undefined || ws <= 0) return undefined;
+  const info = await lookupOrInfo(uid);
+  const or = info ? blendedPricePer1M({ input: info.inputPer1M, output: info.outputPer1M }) : undefined;
+  if (or === undefined || or <= 0) return undefined;
+  const quotaWeekly = params?.quotaWeeklyUsd ?? 50;
+  const plan = params?.planUsdPerMo ?? DEFAULT_PLAN_USD_PER_MO;
+  const subBase = (quotaWeekly * WEEKS_PER_MO) / plan;
+  return subBase * or / ws;
 }
 
 // ----------------------------------------------------------------------------
